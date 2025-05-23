@@ -1,4 +1,4 @@
-
+import { PromptTemplate } from "@langchain/core/prompts";
 import { fromPreTrained } from "@lenml/tokenizer-gemini";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 export interface PageDict {
@@ -86,83 +86,16 @@ export function get_splitter(
 }
 
 
-// export function chunkByTokens(
-//   tokenizer: any,
-//   text: string,
-//   maxTokens = 2000,
-//   buffer = 50
-// ): string[][] {
-//   const cleanedText = cleanArxivText(text);
-//   const sentences = cleanedText.trim().split(/(?<=[.!?])\s+/);
-//   return createChunks(tokenizer, sentences, maxTokens, buffer);
-// }
-
-// export function createChunks(
-//   tokenizer: any,
-//   texts: string[],
-//   maxTokens: number,
-//   buffer: number
-// ): string[][] {
-//   const chunks: string[][] = [];
-//   let currentChunk: string[] = [];
-//   let currentTokens = 0;
-
-//   for (const sentence of texts) {
-//     const tokenCount = tokenizer.encode(sentence).length;
-
-//     if (currentTokens + tokenCount > maxTokens - buffer) {
-//       if (currentChunk.length > 0) {
-//         chunks.push([...currentChunk]);
-//       }
-//       currentChunk = [sentence];
-//       currentTokens = tokenCount;
-//     } else {
-//       currentChunk.push(sentence);
-//       currentTokens += tokenCount;
-//     }
-//   }
-
-//   if (currentChunk.length > 0) {
-//     chunks.push([...currentChunk]);
-//   }
-
-//   return chunks;
-// }
-
-
-//  function assignLabel(corpus: string[], prevChunkSize = 0): string[] {
-//   return corpus.map((sentence, i) => {
-//     const index = i + prevChunkSize;
-//     return `${sentence.trim()} [${index}]\n`;
-//   });
-// }
-
-// export function assignLabelAll(chunks: string[][]): Record<number, PassageLabel> {
-//   const passageLabels: Record<number, PassageLabel> = {};
-
-//   let prevChunkEnd = 0;
-
-//   chunks.forEach((chunk, i) => {
-//     const chunkLen = chunk.length;
-
-//     passageLabels[i] = {
-//       passages: assignLabel(chunk, prevChunkEnd),
-//       info: [chunkLen, prevChunkEnd],
-//     };
-
-//     prevChunkEnd += chunkLen;
-//   });
-//   return passageLabels;
-// }
 
 
 export function get_chunks_with_ids(text: string): SentenceWithId[] {
-  const referencesPattern = /(References|Bibliography|References\s?and\s?Acknowledgements).*?(?=\n\n[A-Z][a-z]+\s.*|$)/g;
+  const referencesPattern = /(References|Bibliography|References\s?and\s?Acknowledgements).*?(?=\n\n[A-Z][a-z]+\s.*|$)/gs;
   const allText = text.replace(referencesPattern, '');
   const originalSentences: Omit<SentenceWithId, 'id'>[] = [];
 
   let currentIndex = 0;
   const sentences = allText.trim().split(/(?<=[.!?])\s+/);
+
 
   for (const sentence of sentences) {
     const trimmed = sentence.trim();
@@ -170,7 +103,7 @@ export function get_chunks_with_ids(text: string): SentenceWithId[] {
     const end = start + trimmed.length;
 
     originalSentences.push({
-      cleaned: cleanArxivText(trimmed),
+      cleaned:cleanArxivText(trimmed),
       char_start: start,
       char_end: end
     });
@@ -235,6 +168,7 @@ function assignLabeledChunks(chunksWithIds: SentenceWithId[][]): LabeledChunks {
 
 export function get_combined_prompt(text: string | null) {
   const combined_prompt = `
+
         <|system|>
             You are a helpful assistant that generates fluent, concise, and meaningful abstractive summaries. Your output should reflect true understanding, avoid redundancy, and provide accurate traceability to the original text.
 
@@ -245,8 +179,6 @@ export function get_combined_prompt(text: string | null) {
         - 🧠 Reorganize the content where helpful to improve clarity and logical flow.
         - ✍️ Maintain a natural, readable tone throughout.
         - ➗ If mathematical formulas or concepts are involved, use LaTeX formatting for clarity.
-          • Use **inline LaTeX** for inline expressions: wrap in \\( ... \\)
-          • Use **block LaTeX** for equations or aligned expressions: wrap in \\begin... \\end
         - Do **not** repeat sentences from the input or simply rephrase them mechanically — instead, paraphrase and condense the ideas clearly, removing unnecessary or redundant details.
         - If appropriate, feel free to use:
         • **Bullet points or numbered lists** for clarity.
@@ -259,15 +191,13 @@ export function get_combined_prompt(text: string | null) {
 
         Input format:
         <sentence>. [n] <next sentence>. [m]
-        Example of proper formatting:
-      - Inline math: \\( f_\\theta(x) := (x; \\theta) \\),
-      - Block math:
-          should start with \\begin ( should have two \\) and end with \\end
-         Text:
+      
        {text}
 
         <|assistant|>
         `;
+
+
   return combined_prompt;
 }
 
@@ -279,10 +209,13 @@ export function retrievePassageByCiteId(
   for (const [key,chunk ] of Object.entries(labeledChunks)) {
     const start = chunk.info[1];
     const end = chunk.info[0] + chunk.info[1];
+
     if (id >= start && id < end) {
-      const index = id - start
+       const index = id - start
+      
       return [chunk.passages[index], key,chunk.char_range[index]];
     }
+    
   }
 
   return undefined; // not found

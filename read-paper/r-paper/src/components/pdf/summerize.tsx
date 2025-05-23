@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useGlobalContext } from "../context/globalcontext"
 import { getHighlightsForCiteIds } from "@/actions/highlight-util"
 
+
 interface SummarizeProps {
   filename?: string
   url?: string
@@ -32,16 +33,7 @@ export function Summarize({ filename, url, title, onNavigateToCitation }: Summar
  const {summary,setSummary,citeHighlights,setCiteHiglights,loadedPdfDocument} =useGlobalContext()
 
 
-  // useEffect(() => {
-  //  if(loadedPdfDocument){
-  //   const getciteHiglights = async() => {
-  //       return 
-  //   } 
-  //  }
-  // },[loadedPdfDocument])
-console.log('====================================');
-console.log(citeHighlights,'citehightlights');
-console.log('====================================');
+
   
   const fetchSummary = async () => {
     if (!filename && !url) {
@@ -57,11 +49,11 @@ console.log('====================================');
       if (filename) formData.append("filename", filename)
       if (url) formData.append("url", url)
 
-      const result = await getSummary(formData)
-      setSummary(result.allsummary)
+     const result = await getSummary(formData)
+    setSummary(result.allsummary)
 
-      const getciteHiglights = await  getHighlightsForCiteIds(loadedPdfDocument!,result.chunkswitlables,result.allsummary)
-      setCiteHiglights(getciteHiglights)
+    //   const getciteHiglights = await  getHighlightsForCiteIds(loadedPdfDocument!,result.chunkswitlables,result.allsummary)
+    //   setCiteHiglights(getciteHiglights)
     } catch (err) {
       console.error("Error fetching summary:", err)
       setError("Failed to generate summary. Please try again.")

@@ -4,9 +4,9 @@
 import { HighlightType } from "../context/globalcontext"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
-import { Trash2, ArrowRight, BookOpen, ImageIcon } from 'lucide-react'
+import { Trash2, BookOpen, ImageIcon } from 'lucide-react'
 import { Badge } from "@/components/ui/badge"
-// import "react-pdf-highlighter/dist/style.css";
+
 interface SidebarProps {
   highlights: Array<HighlightType>
   resetHighlights?: () => void
@@ -24,7 +24,7 @@ export function Sidebar({ highlights, resetHighlights,onDeleteHighlight, toggleD
       <div className="p-4 border-b">
         <h3 className="font-medium text-xl">Highlights</h3>
         <p className="text-lg text-muted-foreground mt-1">
-          {highlights.length} {highlights.length === 1 ? "highlight" : "highlights"}
+          {highlights.filter((h) => !h.url).length} {highlights.length === 1 ? "highlight" : "highlights"}
            
         </p>
         <p className="text-sm text-muted-foreground mt-1">
@@ -35,10 +35,11 @@ export function Sidebar({ highlights, resetHighlights,onDeleteHighlight, toggleD
         </p>
       </div>
 
-      {highlights.length > 0 ? (
+      {highlights.length  > 0 ? (
         <ScrollArea className="h-[400px]">
           <ul className="divide-y">
             {highlights.map((highlight, index) => (
+              !highlight.url &&
               <li
                 key={highlight.id || index}
                 className="p-3 hover:bg-muted/50 transition-colors cursor-pointer"

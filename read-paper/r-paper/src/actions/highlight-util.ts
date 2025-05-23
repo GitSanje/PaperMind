@@ -1,6 +1,9 @@
 import type { PDFDocumentProxy } from "pdfjs-dist"
-import { findNumbers, LabeledChunks, passacesCites, retrieveAllPassageByCiteId } from "./utils"
+import {  findNumbers, LabeledChunks, retrieveAllPassageByCiteId } from "./utils"
+import stringSimilarity from 'string-similarity';
+import { HighlightType } from "@/components/context/globalcontext"
 
+import { LTWHP, Scaled} from 'react-pdf-highlighter'
 
 // Generate a unique ID for highlights
 export const getNextId = () => String(Math.random()).slice(2)
@@ -11,31 +14,7 @@ type PageTextInfo = {
   endIndex: number
   text: string
 }
-type Scaled = {
-  x1: number
-  y1: number
-  x2: number
-  y2: number
-}
 
-type ScaledPosition = {
-  boundingRect: Scaled
-  rects: Scaled[]
-  pageNumber: number
-}
-
-type HighlightType = {
-  id: string
-  content: {
-    text: string
-  }
-  position: ScaledPosition
-  color: string
-  comment: {
-    text: string
-  }
-  url?: string
-}
 
 
 export async function extractFullTextWithPageRanges(
@@ -46,6 +25,7 @@ export async function extractFullTextWithPageRanges(
   const numPages = pdfDocument.numPages
 
   for (let pageNumber = 1; pageNumber <= numPages; pageNumber++) {
+    
     const page = await pdfDocument.getPage(pageNumber)
     const textContent = await page.getTextContent()
 
@@ -70,51 +50,117 @@ export async function extractFullTextWithPageRanges(
 }
 
 
+function normalizeMath(text:string):string {
+  return text
+    .replace(/\s+/g, ' ')                       // collapse whitespace
+    .replace(/[∑Σ]/g, 'sum')                   // unify summation symbols
+    .replace(/[⟨⟩]/g, '')                      // remove inner product symbols
+    .replace(/[−–—]/g, '-')                    // normalize dashes
+    .replace(/[∂]/g, 'd')                      // replace partial derivative
+    .replace(/[√]/g, 'sqrt')                   // normalize square root
+    .replace(/θ/g, 'theta')                    // unify Greek symbols
+    .replace(/[^\w\s]/g, '')                   // strip other symbols
+    .trim()
+    .toLowerCase()
+}
+function normalize(text: string): string {
+  return normalizeMath(text.replace(/\s+/g, ' ').replace( /\[(\d+(?:,\s*\d+)*)\]/g,' ').trim().toLowerCase())
+}
+
+function splitIntoSentences(text: string): string[] {
+  return text
+    .match(/[^.!?]+[.!?]+/g)
+    ?.map((s) => s.trim()) ?? []
+}
 
 
-// Find text on a specific page and return its position
-// export async function findTextOnPage(
-//   pdfDocument: PDFDocumentProxy,
-//   pageNumber: number,
-//   searchText: string,
-// ): Promise<{ startIndex: number; endIndex: number } | null> {
-//   try {
-//     const page = await pdfDocument.getPage(pageNumber)
-//     const textContent = await page.getTextContent()
 
-//     // Combine all text items into a single string
-//     let fullText = ""
-//     textContent.items.forEach((item: any) => {
-//       fullText += item.str
-//     })
+export async function fuzzySearchInPDF(
+  searchText: string,
+  pageRanges: PageTextInfo[]
+): Promise<{
+  pageNumber: number
+  sentence: string
+  sentenceIndex: number
+  score: number
+  startIndex: number
+  endIndex: number
+} | null> {
+  const normalizedQuery = normalize(searchText)
 
-//     // Find the text in the full content
-//     const startIndex = fullText.indexOf(searchText)
-//     if (startIndex === -1) return null
+  let bestMatch: {
+    pageNumber: number
+    sentence: string
+    sentenceIndex: number
+    score: number
+    startIndex: number
+    endIndex: number
+  } | null = null
 
-//     const endIndex = startIndex + searchText.length
+  for (const { pageNumber, text } of pageRanges) {
+    const sentences = splitIntoSentences(text)
 
-//     return {
-//       startIndex,
-//       endIndex,
-//     }
-//   } catch (error) {
-//     console.error("Error finding text on page:", error)
-//     return null
-//   }
-// }
+    sentences.forEach((sentence, index) => {
+      const normalizedSentence = normalize(sentence)
+      const score = stringSimilarity.compareTwoStrings(normalizedQuery, normalizedSentence)
+
+      const startIndex = sentences.slice(0, index).reduce((acc, s) => acc + s.length, 0)
+      const endIndex = startIndex + sentence.length
+
+      if (!bestMatch || score > bestMatch.score) {
+        bestMatch = {
+          pageNumber,
+          sentence,
+          sentenceIndex: index,
+          score,
+          startIndex,
+          endIndex,
+        }
+      }
+    })
+  }
+
+  return bestMatch
+}
+
+
+interface WIDTH_HEIGHT {
+  width: number;
+  height: number;
+}
+export const viewportToScaled = (
+  rect: LTWHP,
+  { width, height }: WIDTH_HEIGHT,
+): Scaled => {
+  return {
+    x1: rect.left,
+    y1: rect.top,
+
+    x2: rect.left + rect.width,
+    y2: rect.top + rect.height,
+
+    width,
+    height,
+
+    pageNumber: rect.pageNumber,
+  };
+};
 
 // Create a highlight from text indices
+// // Update the createHighlightFromIndices function to use the correct position format
 export async function createHighlightFromIndices(
-    pdfDocument:PDFDocumentProxy,
+  pdfDocument: PDFDocumentProxy,
   pageNumber: number,
   startIndex: number,
   endIndex: number,
+  idvalue: string ,
+  text?:string,
   color = "#FFEB3B",
 ): Promise<HighlightType | null> {
   try {
     const page = await pdfDocument.getPage(pageNumber)
     const textContent = await page.getTextContent()
+    
 
     // Build a map of text items with their positions in the full text
     let fullText = ""
@@ -132,6 +178,10 @@ export async function createHighlightFromIndices(
     // Find the items that overlap with our target range
     const relevantItems = textItems.filter((item) => item.startIndex <= endIndex && item.endIndex >= startIndex)
 
+    // Extract the highlighted text
+    const highlightedText = fullText.substring(startIndex, endIndex)
+ 
+    
     if (relevantItems.length === 0) {
       console.error("Text not found on specified page")
       return null
@@ -139,60 +189,94 @@ export async function createHighlightFromIndices(
 
     // Create rects for the highlight
     const viewport = page.getViewport({ scale: 1.0 })
-     const rects: Scaled[] = relevantItems.map((item) => {
-      const [x, y] = item.transform ? [item.transform[4], item.transform[5]] : [0, 0]
-      const width = item.width || item.str.length * 5
-      const height = item.height || 12
 
-      const x1 = x
-      const y1 = viewport.height - y
-      const x2 = x + width
-      const y2 = viewport.height - y + height
+const rects = relevantItems.map((item) => {
+  const tx = item.transform[4];
+  const ty = item.transform[5];
+  const width = item.width;
+  const height = item.height;
 
-      return { x1, y1, x2, y2 }
-    })
+  const [left, top] = viewport.convertToViewportPoint(tx, ty);
+const [right, bottom] = viewport.convertToViewportPoint(tx + width, ty - height);
+  const normLeft = Math.min(left, right);
+  const normTop = Math.min(top, bottom);
+  const normWidth = Math.abs(right - left);
+  const normHeight = Math.abs(bottom - top);
 
-    // Create a bounding rect that encompasses all the text items
-    const boundingRect = rects.reduce(
-      (acc, r) => ({
-        x1: Math.min(acc.x1, r.x1),
-        y1: Math.min(acc.y1, r.y1),
-        x2: Math.max(acc.x2, r.x2),
-        y2: Math.max(acc.y2, r.y2),
-      }),
-      {
-        x1: Infinity,
-        y1: Infinity,
-        x2: -Infinity,
-        y2: -Infinity,
-      }
-    )
+  return {
+    left: normLeft,
+    top: normTop,
+    width: normWidth,
+    height: normHeight,
+    pageNumber,
+  };
+});
 
-    // // Calculate width and height from right/bottom
-    // boundingRect.width = boundingRect.right - boundingRect.left
-    // boundingRect.height = boundingRect.bottom - boundingRect.top
 
-    // Extract the highlighted text
-    const highlightedText = fullText.substring(startIndex, endIndex)
-    const id = getNextId()
-    const url = `#highlight-${id}`
+  const rectsM= Array.from(rects).map((rect) => {
+    const { left, top, width, height } = rect;
 
-    // Create the highlight object
+    const X0 = left;
+    const X1 = left + width;
+
+    const Y0 = top;
+    const Y1 = top + height;
+
+    return { X0, X1, Y0, Y1, pageNumber};
+  });
+
+   const rectsWithSizeOnFirstPage = rectsM.filter(
+    (rect) =>
+      (rect.X0 > 0 || rect.X1 > 0 || rect.Y0 > 0 || rect.Y1 > 0) 
+     
+  );
+
+ const optimal = rectsWithSizeOnFirstPage.reduce((res, rect) => {
+    return {
+      X0: Math.min(res.X0, rect.X0),
+      X1: Math.max(res.X1, rect.X1),
+
+      Y0: Math.min(res.Y0, rect.Y0),
+      Y1: Math.max(res.Y1, rect.Y1),
+
+      pageNumber: pageNumber,
+    };
+  }, rectsWithSizeOnFirstPage[0]);
+   const { X0, X1, Y0, Y1 } = optimal;
+
+
+  const boundingRectViewport = {
+    left: X0,
+    top: Y0,
+    width: X1 - X0,
+    height: Y1 - Y0,
+    pageNumber,
+  };
+  const viewportW = viewport.width
+  const viewportH = viewport.height
+   
+     
+   const boundingRect = viewportToScaled(boundingRectViewport,{width:viewportW,height:viewportH})
+  
+    // Create the highlight object with ScaledPosition format
     const newHighlight: HighlightType = {
-      id: getNextId(),
+      id: idvalue,
       content: {
-        text: highlightedText,
+        text: text,
       },
       position: {
         boundingRect,
-        rects,
+        rects: (rects || []).map((rect) => viewportToScaled(rect, {width:viewportW,height:viewportH})),
         pageNumber,
+        usePdfCoordinates: false,
       },
       color,
       comment: {
-        text: "",
+        text: idvalue || "",
+        emoji: "",
       },
-       url,
+      
+      url:`highlightcite-${idvalue}`
     }
 
     return newHighlight
@@ -204,125 +288,63 @@ export async function createHighlightFromIndices(
 
 
 
-export async function createHighlightsFromGlobalIndices(
-  pdfDocument: PDFDocumentProxy,
-  globalStart: number,
-  globalEnd: number,
-  pageRanges: PageTextInfo[],
-  color = "#FFEB3B",
-  
-): Promise<HighlightType|null> {
-
-//   const highlights: HighlightType[] = []
-
-  for (const pageInfo of pageRanges) {
-    const { pageNumber, startIndex, endIndex } = pageInfo
-
-    // If there's any overlap with the global highlight range
-    const overlapStart = Math.max(globalStart, startIndex)
-    const overlapEnd = Math.min(globalEnd, endIndex)
-
-    if (overlapStart < overlapEnd) {
-      const localStart = overlapStart - startIndex
-      const localEnd = overlapEnd - startIndex
-
-      const highlight = await createHighlightFromIndices(
-        pdfDocument,
-        pageNumber,
-        localStart,
-        localEnd,
-        color
-      )
-
-      if (highlight) return highlight
-    }
-  }
-
-  return null
-}
 
 
-// // Search for text across all pages and create highlights
-// export async function searchAndHighlight(
-//   pdfDocument: PDFDocumentProxy,
-//   searchText: string,
-//   color = "#FFEB3B",
-// ): Promise<HighlightType[]> {
-//   const highlights: HighlightType[] = []
 
-//   try {
-//     const numPages = pdfDocument.numPages
 
-//     for (let pageNumber = 1; pageNumber <= numPages; pageNumber++) {
-//       const position = await findTextOnPage(pdfDocument, pageNumber, searchText)
 
-//       if (position) {
-//         const highlight = await createHighlightFromIndices(
-//           pdfDocument,
-//           pageNumber,
-//           position.startIndex,
-//           position.endIndex,
-//           color,
-//         )
 
-//         if (highlight) {
-//           highlights.push(highlight)
-//         }
-//       }
-//     }
-
-//     return highlights
-//   } catch (error) {
-//     console.error("Error searching and highlighting:", error)
-//     return highlights
-//   }
-// }
-
-interface CiteHighlights {
-    [key: number] : HighlightType
-}
 export async function getHighlightsForCiteIds(
   pdfDocument: PDFDocumentProxy,
   labeledChunks: LabeledChunks,
   summaries:string,
   color = "#FFEB3B"
-): Promise<Record<number, HighlightType>> {
-   const ids = findNumbers(summaries)
+): Promise<HighlightType[]> {
+  const outputids = findNumbers(summaries)
+    const ids = [...new Set(outputids)].sort((a, b) => a - b);
+    console.log('====================================');
+    console.log("ids", ids,outputids);
+    console.log('====================================');
+
   const passages = retrieveAllPassageByCiteId(labeledChunks, ids);
-  const highlightsMap: Record<number, HighlightType> = {};
+
+  
+  const highlightsMap: HighlightType[] = [];
   const { fullText, pageRanges } = await extractFullTextWithPageRanges(pdfDocument)
+
+    
   for (const id of ids) {
-    const range = passages[id]?.range;
-
-    if (range && typeof range[0] === "number" && typeof range[1] === "number") {
-      const [globalStart, globalEnd] = range;
-
-      const highlights = await createHighlightsFromGlobalIndices(
-        pdfDocument,
-        globalStart,
-        globalEnd,
-        pageRanges,
-        color=color
-      );
-
-      highlightsMap[id] = highlights!;
+    const text = passages[id].sen
+   
+    const result =  await fuzzySearchInPDF(text,pageRanges)
+    if(!result){
+      console.log(`no result in text ${text} id ${id}`);
+      
     }
+    if(result){
+      
+      const highlight = await createHighlightFromIndices(
+          pdfDocument,
+          result.pageNumber,
+          result.startIndex,
+          result.endIndex,
+          id.toString(),
+          text,
+          color,
+        )
+        if(!highlight){
+          console.log(`no highlight result in text ${text} id ${id}`);
+        }
+          if(highlight){
+             highlightsMap.push(highlight);
+     }
+
+    }
+     
+      
   }
 
   return highlightsMap;
 }
 
 
-// export async function searchAndHighlight(passages_cites: passacesCites,  pdfDocument: PDFDocumentProxy){
-//      const highlights:CiteHighlights  = {}
-//        const { fullText, pageRanges } = await extractFullTextWithPageRanges(pdfDocument)
-
-//     for (const [key,value] of Object.entries(passages_cites)){
-//         const highlight = await createHighlightsFromGlobalIndices(pdfDocument,value.range[0], value.range[1],pageRanges)
-//         highlights[Number(key)] = highlight!
-
-//     }
-
-//     return highlights
-
-// }

@@ -17,11 +17,11 @@ import type {
   IHighlight,
   NewHighlight,
   ScaledPosition,
-   Position
+  Position,
 } from "react-pdf-highlighter";
 export type T_ViewportHighlight<T_HT> = { position: Position } & T_HT;
 
-
+import { PDFViewerOptions } from "pdfjs-dist/types/web/pdf_viewer";
 import { Spinner } from "../ui/spinner";
 import { useGlobalContext, HighlightType } from "../context/globalcontext";
 import { PDFDocumentProxy } from "pdfjs-dist";
@@ -33,23 +33,27 @@ interface PDFViewerProps {
   setTotalPages: (pages: number) => void;
   scale: number;
   activeHighlightColor: string;
-   onTextSelection?: (text: string, position: { x: number; y: number }) => void
-
+  onTextSelection?: (text: string, position: { x: number; y: number }) => void;
 }
 
 interface NewHighlightVarient extends NewHighlight {
   color?: string;
 }
 const getNextId = () => String(Math.random()).slice(2);
-const parseIdFromHash = () =>
-  document.location.hash.slice("#highlight-".length);
+const parseIdFromHash = () => {
+  const hash = window.location.hash;
+  const hashtype = hash.startsWith("#highlightcite")
+    ? "#highlightcite"
+    : "#highlight";
+
+  const highlightid = hash.slice(`${hashtype}-`.length);
+  return { hashtype, highlightid };
+};
 
 import { pdfjs } from "react-pdf";
 
 import { CustomHighlight } from "./custom-highlight";
 import { hexToRgba } from "@/lib/utils";
-import { mixedText3 } from "./markdown";
-import { getHighlightsForCiteIds } from "@/actions/highlight-util";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
@@ -62,10 +66,19 @@ export default function PDFViewer({
   setTotalPages,
   scale,
   activeHighlightColor,
-  onTextSelection
+  onTextSelection,
 }: PDFViewerProps) {
- 
-  const { isSelecting, highlights, setHighlights,handleDeleteHighlight,updateHighlightColor,handleAskAI,loadedPdfDocument,setPdfDocument } = useGlobalContext();
+  const {
+    isSelecting,
+    pagehighlights,
+    setHighlights,
+    handleDeleteHighlight,
+    updateHighlightColor,
+    handleAskAI,
+    loadedPdfDocument,
+    setPdfDocument,
+    citeHighlights,
+  } = useGlobalContext();
 
   const scrollViewerTo = useRef((highlight: IHighlight) => {});
   useEffect(() => {
@@ -73,9 +86,14 @@ export default function PDFViewer({
       setTotalPages(loadedPdfDocument.numPages);
     }
   }, [loadedPdfDocument, setTotalPages]);
- 
-
- 
+useEffect(() => {
+  if (citeHighlights.length > 0) {
+    setHighlights(prev => {
+      const updated = prev.concat(citeHighlights);
+      return updated;
+    });
+  }
+}, [citeHighlights]);
 
   const HighlightPopup = ({
     comment,
@@ -102,36 +120,34 @@ export default function PDFViewer({
 
   const resetHash = () => {
     document.location.hash = "";
-
   };
 
-
   const getHighlightById = useCallback(
-    (id: string) => {
-      return highlights.find((highlight) => highlight.id === id);
+    (id: string, hashtype: string) => {
+      if (hashtype === "#highlight") {
+        return pagehighlights.find((highlight) => highlight.id === id);
+      } else {
+        return citeHighlights.find((highlight) => highlight.id === id);
+      }
     },
-    [highlights]
+    [pagehighlights, citeHighlights]
   );
 
   const scrollToHighlightFromHash = useCallback(() => {
-    const highlightId = parseIdFromHash();
-    if (!highlightId) return;
+    const highlightInfo = parseIdFromHash();
+    if (!highlightInfo.highlightid) return;
 
-    const highlight = getHighlightById(highlightId);
+    const { highlightid, hashtype } = highlightInfo;
+    const highlight = getHighlightById(highlightid, hashtype);
 
-    if (highlight) {
-      // First set the page number
-      if (highlight.position && highlight.position.pageNumber) {
-        setCurrentPage(highlight.position.pageNumber);
-      }
-      // Then scroll to the highlight with a slight delay
-
-      scrollViewerTo.current(highlight);
-     
+    if (highlight && scrollViewerTo.current) {
+      setTimeout(() => {
+        if (scrollViewerTo.current) {
+          scrollViewerTo.current(highlight);
+        }
+      }, 200); // or highlight.position
     }
-  }, [getHighlightById, setCurrentPage, scrollViewerTo]);
-
-
+  }, [getHighlightById, citeHighlights]);
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -147,7 +163,11 @@ export default function PDFViewer({
 
   const addHighlight = (highlight: NewHighlightVarient) => {
     setHighlights((prevHighlights) => [
-      { ...highlight, id: getNextId(), color:hexToRgba(activeHighlightColor,0.5) },
+      {
+        ...highlight,
+        id: getNextId(),
+        color: hexToRgba(activeHighlightColor, 0.5),
+      },
       ...prevHighlights,
     ]);
   };
@@ -164,7 +184,7 @@ export default function PDFViewer({
           id,
           position: originalPosition,
           content: originalContent,
-          color:color,
+          color: color,
           ...rest
         } = h;
         return id === highlightId
@@ -172,7 +192,7 @@ export default function PDFViewer({
               id,
               position: { ...originalPosition, ...position },
               content: { ...originalContent, ...content },
-              color:color,
+              color: color,
               ...rest,
             }
           : h;
@@ -187,22 +207,24 @@ export default function PDFViewer({
 
   const pdfContainerRef = useRef<HTMLDivElement | null>(null);
 
- // Handle text selection for dictionary/AI lookup
+  // Handle text selection for dictionary/AI lookup
   const handleTextSelection = (position: ScaledPosition, content: Content) => {
     if (!isSelecting && onTextSelection && content.text) {
       // Get the selection position
-      const selection = window.getSelection()
+      const selection = window.getSelection();
       if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0)
-        const rect = range.getBoundingClientRect()
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
 
         onTextSelection(content.text, {
           x: rect.left + rect.width / 2,
           y: rect.top,
-        })
+        });
       }
     }
-  }
+  };
+  
+
   return (
     <div
       className=""
@@ -228,7 +250,6 @@ export default function PDFViewer({
                   pdfDocument={pdfDocument}
                   enableAreaSelection={(event) => event.altKey}
                   onScrollChange={() => {
-
                     resetHash();
                   }}
                   scrollRef={(scrollTo) => {
@@ -243,7 +264,7 @@ export default function PDFViewer({
                   ) => {
                     if (!isSelecting) {
                       hideTipAndSelection();
-                       handleTextSelection(position, content)
+                      handleTextSelection(position, content);
                       return null;
                     }
                     return (
@@ -268,17 +289,16 @@ export default function PDFViewer({
                     const isTextHighlight = !highlight.content?.image;
 
                     const component = isTextHighlight ? (
-                  
-                  <CustomHighlight
-              position={highlight.position}
-              comment={highlight.comment}
-              isScrolledTo={isScrolledTo}
-              highlightColor={highlight.color}
-              highlight = {highlight}
-              handleDeleteHighlight={handleDeleteHighlight}
-              updateHighlightColor={updateHighlightColor}
-              onAskAI={handleAskAI}
-              />
+                      <CustomHighlight
+                        position={highlight.position}
+                        comment={highlight.comment}
+                        isScrolledTo={isScrolledTo}
+                        highlightColor={highlight.color}
+                        highlight={highlight}
+                        handleDeleteHighlight={handleDeleteHighlight}
+                        updateHighlightColor={updateHighlightColor}
+                        onAskAI={handleAskAI}
+                      />
                     ) : (
                       <AreaHighlight
                         isScrolledTo={isScrolledTo}
@@ -300,14 +320,13 @@ export default function PDFViewer({
                           setTip(highlight, (h) => popupContent)
                         }
                         onMouseOut={hideTip}
-                        
                         key={index}
                       >
                         {component}
                       </Popup>
                     );
                   }}
-                  highlights={highlights as any}
+                  highlights={pagehighlights as any}
                 />
               </div>
             );

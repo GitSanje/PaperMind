@@ -1,8 +1,10 @@
 "use client"
+
 import { PDFDocumentProxy } from "pdfjs-dist"
 import type React from "react"
 import { createContext, useContext, useState, type ReactNode } from "react"
 import type { Content, IHighlight, ScaledPosition } from "react-pdf-highlighter"
+
 
 export interface HighlightType extends IHighlight {
   color?: string
@@ -12,8 +14,10 @@ export interface HighlightType extends IHighlight {
 interface ContextProps {
   isSelecting: boolean
   setIsSelecting: (isSelecting: boolean) => void
-  highlights: HighlightType[]
+  pagehighlights: HighlightType[]
   setHighlights: React.Dispatch<React.SetStateAction<HighlightType[]>>
+   citeHighlights:HighlightType[]
+  setCiteHiglights: React.Dispatch<React.SetStateAction<HighlightType[]>>
   handleDeleteHighlight: (id: string) => void
   updateHighlightColor: (id: string, color: string) => void
   updateHighlight: (
@@ -33,10 +37,13 @@ interface ContextProps {
   setAiQuery: (q:string) =>void
   summary: string
   setSummary:(summary:string) => void
-  citeHighlights: Record<number, HighlightType> | undefined
-  setCiteHiglights: (citeHighlights: Record<number, HighlightType>) => void
+ 
   loadedPdfDocument: PDFDocumentProxy|null
   setPdfDocument : (pdfdocument: PDFDocumentProxy) =>void
+  activeCiteHighlights: HighlightType|undefined
+  setActiveCiteHighlights: (highlight: HighlightType|undefined) =>void
+
+  
 
   
 
@@ -47,19 +54,22 @@ const GContext = createContext<ContextProps | null>(null)
 
 export const GlobalContextProvider = ({ children }: { children: ReactNode }) => {
   const [isSelecting, setIsSelecting] = useState<boolean>(true)
-  const [highlights, setHighlights] = useState<Array<HighlightType>>([])
+  const [pagehighlights, setHighlights] = useState<Array<HighlightType>>([])
   const [tab, setTab] = useState("tool")
     const [selectedText, setSelectedText] = useState("");
     const [showSelectionPopup, setShowSelectionPopup] = useState(false);
      const [aiQuery, setAiQuery] = useState("");
        const [summary, setSummary] = useState<string>("")
-       const [citeHighlights, setCiteHiglights] = useState<Record<number, HighlightType>>()
+       const [citeHighlights, setCiteHiglights] = useState<Array<HighlightType>>([])
          const [loadedPdfDocument, setPdfDocument] = useState<PDFDocumentProxy | null>(
            null
          );
 
+         const [activeCiteHighlights, setActiveCiteHighlights] = useState<HighlightType|undefined>();
+
+
   const handleDeleteHighlight = (id: string) => {
-    setHighlights(highlights.filter((h) => h.id !== id))
+    setHighlights(pagehighlights.filter((h) => h.id !== id))
   }
 
   const updateHighlightColor = (id: string, color: string) => {
@@ -106,7 +116,7 @@ export const GlobalContextProvider = ({ children }: { children: ReactNode }) => 
       value={{
         isSelecting,
         setIsSelecting,
-        highlights,
+        pagehighlights,
         setHighlights,
         handleDeleteHighlight,
         updateHighlightColor,
@@ -125,7 +135,9 @@ export const GlobalContextProvider = ({ children }: { children: ReactNode }) => 
         citeHighlights,
         setCiteHiglights,
         loadedPdfDocument,
-        setPdfDocument
+        setPdfDocument,
+        activeCiteHighlights,
+        setActiveCiteHighlights
         
         
       }}

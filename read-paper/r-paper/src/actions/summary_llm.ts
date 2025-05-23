@@ -110,7 +110,10 @@ export async function getSummary(formdata: FormData) {
   const result = await getTextFromPDF(filename, url);
 
   const allText = result.pages_list.join("");
+
  const cleanedSentences = get_chunks_with_ids(allText) 
+
+ 
   const chunkswitlables = createChunksPreservingId(cleanedSentences,tokenizer, 2500,50)
 
   const summaries_chunk = await getSummaryByChunk(chunkswitlables);

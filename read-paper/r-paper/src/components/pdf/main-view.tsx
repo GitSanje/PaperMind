@@ -75,7 +75,7 @@ export default function PDFViewerPage() {
 
   const {  isSelecting,
         setIsSelecting,
-        highlights,
+        pagehighlights,
         setHighlights,
         handleDeleteHighlight,
         selectedText,
@@ -133,7 +133,7 @@ export default function PDFViewerPage() {
     const data = {
       fileName: file.name,
       notes,
-      highlights,
+      pagehighlights,
       lastPage: currentPage,
     };
 
@@ -519,7 +519,7 @@ export default function PDFViewerPage() {
 
             <TabsContent value="highlights">
               <Sidebar
-                highlights={highlights}
+                highlights={pagehighlights}
                 resetHighlights={resetHighlights}
                 onDeleteHighlight={handleDeleteHighlight}
               />
