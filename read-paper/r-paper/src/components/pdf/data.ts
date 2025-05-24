@@ -1299,3 +1299,27 @@ export const highlightex = {
     },
     "url": "highlightcite-165"
 }
+
+const x = `Artificial Neural Networks (ANNs) in the infinite-width limit are equivalent to Gaussian processes, linking them to kernel methods [0, 23]. This paper examines the network function \( f_\theta \) of an ANN, which maps input vectors to output vectors, where \( \theta \) represents the ANN's parameters [26].
+
+Key findings include:
+
+*   **Kernel Gradient Descent:** During gradient descent, the network function \( f_\theta \) follows the kernel gradient descent in function space with respect to a limiting kernel, which depends on the network's depth, nonlinearity, and initialization variance [28].
+*   **Neural Tangent Kernel (NTK):** The evolution of an ANN during training can be described by a kernel. During gradient descent on the parameters of an ANN, the network function \( f_\theta \) follows the kernel gradient of the functional cost with respect to the NTK [1, 2]. In the infinite-width limit, the NTK converges to an explicit limiting kernel and remains constant during training [4].
+*   **Convergence:** Convergence during training relates to the positive-definiteness of the infinite-width limit NTK. The paper proves this positive-definiteness when the dataset is supported on a sphere and the nonlinearity is non-polynomial [6, 7, 30].
+*   **Linear Differential Equation:** For a least-squares regression loss, the network function \( f_\theta \) follows a linear differential equation in the infinite-width limit, where the eigenfunctions of the Jacobian are the kernel principal components of the input data [8, 32]. This connection to kernel methods motivates early stopping to reduce overfitting [33].
+*   **Numerical Investigation:** The theoretical results are investigated numerically using an artificial dataset and the MNIST dataset, observing that the behavior of wide ANNs is close to the theoretical limit [34, 35].
+
+During training, the network function \( f_\theta \) descends along the kernel gradient with respect to the NTK, allowing the study of ANN training in the function space \( \mathcal{F} \) where the cost \( \mathcal{C} \) is convex [55, 56]. A time-dependent function $f(t)$ follows kernel gradient descent with respect to $K$ if it satisfies $\partial_t f(t) = -\nabla_K C|_{f(t)}$ [70]. Convergence to a critical point of $C$ is guaranteed if $K$ is positive definite, making the cost strictly decreasing except where $\| d|_{f(t)} \|_{p \text{ in}} = 0$ [72].
+
+For ANNs trained with gradient descent, the network function $f_\theta$ evolves along the kernel gradient with respect to the NTK \( \Theta^{(L)}(\theta) \) [84]. In the infinite-width limit, the NTK becomes deterministic and constant during training [88]. As the network width approaches infinity, output functions tend to i.i.d. Gaussian processes with covariance \( \Sigma^{(L)} \), defined recursively [90, 91]. In the same limit, the NTK converges in probability to a deterministic limiting kernel \( \Theta^{(L)}_\infty \) [95, 97, 98].
+
+The dynamics of \( f_\theta \) is described by \( \partial_t f_\theta(t) = \Phi_{\Theta^{(L)}_\infty \otimes \text{Id}_{n_L}} (\langle d_t, \cdot \rangle_{p \text{ in}}) \) [110]. The solution to the differential equation describing this behavior can be expressed using a map \( \Pi \), where \( f_t = f^* + e^{-t\Pi}(f_0 - f^*) \) [123]. The map \( \Pi \) has at most \( Nn_L \) positive eigenfunctions, which are the kernel principal components of the data with respect to the kernel \( K \) [127].
+
+Decomposing the difference \( (f^* - f_0) \) along the eigenspaces of \( \Pi \), the trajectory of the function \( f_t \) is given by \( f_t = f^* + \Delta_0 f + \sum_{i=1}^{Nn_L} e^{-t\lambda_i} \Delta_i f \) [129]. This motivates early stopping, as convergence is faster along eigenspaces with larger eigenvalues \( \lambda_i \) [130, 131].
+
+Numerical experiments compare ANNs of varying widths to the theoretical infinite-width limit, using the ReLU nonlinearity [138, 139]. Wider networks deviate less from the straight line, and the trajectory along the second principal component converges to the theoretical limit as width increases [178, 179].
+
+In conclusion, the NTK describes the local dynamics of an ANN during gradient descent, establishing a connection between ANN training and kernel methods [185]. In the infinite-width limit, ANN gradient descent is equivalent to kernel gradient descent with respect to a constant kernel \( \Theta_{\infty}^{(L)} \) [186, 187].
+
+`

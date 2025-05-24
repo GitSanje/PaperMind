@@ -69,7 +69,7 @@ export function AskAI({ query, setQuery, file, url }: AskAIProps) {
         for (let i = 0; i < fullResponse.length; i++) {
           displayedResponse += fullResponse[i]
           setStreamingResponse(displayedResponse)
-          await new Promise((resolve) => setTimeout(resolve, 10)) // Adjust speed as needed
+          await new Promise((resolve) => setTimeout(resolve, 10)) 
         }
 
         // When streaming is complete, add to conversation

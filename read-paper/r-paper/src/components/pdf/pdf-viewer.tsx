@@ -21,7 +21,7 @@ import type {
 } from "react-pdf-highlighter";
 export type T_ViewportHighlight<T_HT> = { position: Position } & T_HT;
 
-import { PDFViewerOptions } from "pdfjs-dist/types/web/pdf_viewer";
+
 import { Spinner } from "../ui/spinner";
 import { useGlobalContext, HighlightType } from "../context/globalcontext";
 import { PDFDocumentProxy } from "pdfjs-dist";
@@ -39,7 +39,18 @@ interface PDFViewerProps {
 interface NewHighlightVarient extends NewHighlight {
   color?: string;
 }
+
+/**
+ * Generates a random string id used for highlights
+ * @returns {string} random id string
+ */
 const getNextId = () => String(Math.random()).slice(2);
+
+/**
+ * Parses the current window.location.hash to extract
+ * the highlight type and id from the URL fragment
+ * @returns {hashtype: string, highlightid: string} parsed info
+ */
 const parseIdFromHash = () => {
   const hash = window.location.hash;
   const hashtype = hash.startsWith("#highlightcite")
@@ -55,10 +66,24 @@ import { pdfjs } from "react-pdf";
 import { CustomHighlight } from "./custom-highlight";
 import { hexToRgba } from "@/lib/utils";
 
+// Configure pdfjs worker to load from CDN
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 const PRIMARY_PDF_URL = "https://arxiv.org/pdf/1708.08021";
 
+/**
+ * PDFViewer component renders a PDF document with
+ * text and area highlight functionality.
+ * It manages highlights, selection, scrolling, and popup notes.
+ *
+ * @param {string} url - PDF document URL to load.
+ * @param {number} currentPage - Current page number displayed.
+ * @param {(page: number) => void} setCurrentPage - Setter to update current page.
+ * @param {(pages: number) => void} setTotalPages - Setter to update total pages.
+ * @param {number} scale - Zoom scale for rendering PDF.
+ * @param {string} activeHighlightColor - Hex color string for new highlights.
+ * @param {(text: string, position: {x:number,y:number}) => void} [onTextSelection] - Optional callback on text selection.
+ */
 export default function PDFViewer({
   url,
   currentPage,
@@ -68,6 +93,7 @@ export default function PDFViewer({
   activeHighlightColor,
   onTextSelection,
 }: PDFViewerProps) {
+  // Extract global context state and methods related to highlights and PDF document
   const {
     isSelecting,
     pagehighlights,
@@ -78,23 +104,34 @@ export default function PDFViewer({
     loadedPdfDocument,
     setPdfDocument,
     citeHighlights,
+    updateHighlight
   } = useGlobalContext();
 
-  const scrollViewerTo = useRef((highlight: IHighlight) => {});
+  // Ref to function that scrolls PDF viewer to a specific highlight
+  const scrollViewerTo = useRef<(highlight: IHighlight) => void>(() => {});
+
+  // When the PDF document is loaded, update the total number of pages
   useEffect(() => {
     if (loadedPdfDocument) {
       setTotalPages(loadedPdfDocument.numPages);
     }
   }, [loadedPdfDocument, setTotalPages]);
-useEffect(() => {
-  if (citeHighlights.length > 0) {
-    setHighlights(prev => {
-      const updated = prev.concat(citeHighlights);
-      return updated;
-    });
-  }
-}, [citeHighlights]);
 
+  // When citeHighlights changes, merge them into main highlights
+  useEffect(() => {
+    if (citeHighlights.length > 0) {
+      setHighlights((prev) => {
+        const updated = prev.concat(citeHighlights);
+        return updated;
+      });
+    }
+  }, [citeHighlights]);
+
+  /**
+   * Popup content component shown when hovering on a highlight.
+   *
+   * @param {{comment?: {text?: string}, content?: {text?: string}}} props
+   */
   const HighlightPopup = ({
     comment,
     content,
@@ -118,10 +155,19 @@ useEffect(() => {
     );
   };
 
+  /**
+   * Clears the URL hash fragment to remove highlight focus
+   */
   const resetHash = () => {
     document.location.hash = "";
   };
 
+  /**
+   * Retrieves a highlight by its id and type
+   * @param {string} id - Highlight ID
+   * @param {string} hashtype - Either "#highlight" or "#highlightcite"
+   * @returns {IHighlight | undefined} found highlight or undefined
+   */
   const getHighlightById = useCallback(
     (id: string, hashtype: string) => {
       if (hashtype === "#highlight") {
@@ -133,6 +179,9 @@ useEffect(() => {
     [pagehighlights, citeHighlights]
   );
 
+  /**
+   * Scrolls the viewer to the highlight referenced in the URL hash
+   */
   const scrollToHighlightFromHash = useCallback(() => {
     const highlightInfo = parseIdFromHash();
     if (!highlightInfo.highlightid) return;
@@ -145,10 +194,12 @@ useEffect(() => {
         if (scrollViewerTo.current) {
           scrollViewerTo.current(highlight);
         }
-      }, 200); // or highlight.position
+      }, 200); // delay to allow viewer rendering before scrolling
     }
   }, [getHighlightById, citeHighlights]);
 
+
+  // Attach event listener to react to changes in URL hash to scroll to highlight
   useEffect(() => {
     const handleHashChange = () => {
       scrollToHighlightFromHash();
@@ -161,6 +212,10 @@ useEffect(() => {
     };
   }, [scrollToHighlightFromHash]);
 
+  /**
+   * Adds a new highlight with generated ID and semi-transparent color
+   * @param {NewHighlightVarient} highlight - new highlight data
+   */
   const addHighlight = (highlight: NewHighlightVarient) => {
     setHighlights((prevHighlights) => [
       {
@@ -172,45 +227,29 @@ useEffect(() => {
     ]);
   };
 
-  const updateHighlight = (
-    highlightId: string,
-    position: Partial<ScaledPosition>,
-    content: Partial<Content>,
-    color?: string
-  ) => {
-    setHighlights((prevHighlights) =>
-      prevHighlights.map((h) => {
-        const {
-          id,
-          position: originalPosition,
-          content: originalContent,
-          color: color,
-          ...rest
-        } = h;
-        return id === highlightId
-          ? {
-              id,
-              position: { ...originalPosition, ...position },
-              content: { ...originalContent, ...content },
-              color: color,
-              ...rest,
-            }
-          : h;
-      })
-    );
-  };
-
+  /**
+   * Handler called when the PDF document finishes loading
+   * Sets the PDF document proxy and total pages in context
+   *
+   * @param {PDFDocumentProxy} pdfDocumentProxy - Loaded PDF document proxy
+   */
   const handleDocumentLoadSuccess = (pdfDocumentProxy: PDFDocumentProxy) => {
     setPdfDocument(pdfDocumentProxy);
     setTotalPages(pdfDocumentProxy.numPages);
   };
 
+  // Reference to the container wrapping the PDF viewer
   const pdfContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Handle text selection for dictionary/AI lookup
+  /**
+   * Handles text selection within the PDF to trigger
+   * the onTextSelection callback with selected text and position
+   *
+   * @param {ScaledPosition} position - Position of selection in scaled coordinates
+   * @param {Content} content - Selected content including text
+   */
   const handleTextSelection = (position: ScaledPosition, content: Content) => {
     if (!isSelecting && onTextSelection && content.text) {
-      // Get the selection position
       const selection = window.getSelection();
       if (selection && selection.rangeCount > 0) {
         const range = selection.getRangeAt(0);
@@ -223,7 +262,6 @@ useEffect(() => {
       }
     }
   };
-  
 
   return (
     <div
@@ -248,13 +286,13 @@ useEffect(() => {
               <div>
                 <PdfHighlighter
                   pdfDocument={pdfDocument}
-                  enableAreaSelection={(event) => event.altKey}
+                  enableAreaSelection={(event) => event.altKey} // Area selection enabled only when Alt key pressed
                   onScrollChange={() => {
-                    resetHash();
+                    resetHash(); // Reset URL hash on scroll to avoid stale highlight
                   }}
                   scrollRef={(scrollTo) => {
                     scrollViewerTo.current = scrollTo;
-                    setTimeout(scrollToHighlightFromHash, 100);
+                    setTimeout(scrollToHighlightFromHash, 100); // Scroll to highlight from hash after mounting
                   }}
                   onSelectionFinished={(
                     position,
@@ -263,10 +301,11 @@ useEffect(() => {
                     transformSelection
                   ) => {
                     if (!isSelecting) {
-                      hideTipAndSelection();
+                      hideTipAndSelection(); // Close tip if not in selecting mode
                       handleTextSelection(position, content);
                       return null;
                     }
+                    // Show tip to add a new highlight
                     return (
                       <Tip
                         onOpen={transformSelection}
@@ -286,8 +325,10 @@ useEffect(() => {
                     screenshot,
                     isScrolledTo
                   ) => {
+                    // Distinguish between text highlights and area/image highlights
                     const isTextHighlight = !highlight.content?.image;
 
+                    // Render appropriate highlight component
                     const component = isTextHighlight ? (
                       <CustomHighlight
                         position={highlight.position}
@@ -326,7 +367,7 @@ useEffect(() => {
                       </Popup>
                     );
                   }}
-                  highlights={pagehighlights as any}
+                  highlights={pagehighlights as any} // Cast due to type restrictions
                 />
               </div>
             );

@@ -86,8 +86,13 @@ export function get_splitter(
 }
 
 
-
-
+/**
+ * Splits input text into cleaned sentences with character ranges and unique IDs.
+ * Removes references and bibliography sections before processing.
+ *
+ * @param {string} text - The input text to split and clean.
+ * @returns {SentenceWithId[]} - Array of sentence objects with `cleaned`, `char_start`, `char_end`, and `id` fields.
+ */
 export function get_chunks_with_ids(text: string): SentenceWithId[] {
   const referencesPattern = /(References|Bibliography|References\s?and\s?Acknowledgements).*?(?=\n\n[A-Z][a-z]+\s.*|$)/gs;
   const allText = text.replace(referencesPattern, '');
@@ -96,14 +101,13 @@ export function get_chunks_with_ids(text: string): SentenceWithId[] {
   let currentIndex = 0;
   const sentences = allText.trim().split(/(?<=[.!?])\s+/);
 
-
   for (const sentence of sentences) {
     const trimmed = sentence.trim();
     const start = currentIndex;
     const end = start + trimmed.length;
 
     originalSentences.push({
-      cleaned:cleanArxivText(trimmed),
+      cleaned: cleanArxivText(trimmed),
       char_start: start,
       char_end: end
     });
@@ -118,7 +122,15 @@ export function get_chunks_with_ids(text: string): SentenceWithId[] {
   return cleanedSentences;
 }
 
-// Create chunks from sentences
+/**
+ * Groups sentences into chunks while preserving IDs, ensuring each chunk does not exceed max token count.
+ *
+ * @param {SentenceWithId[]} sentencesWithIds - Array of sentence objects with IDs.
+ * @param {object} tokenizer - Tokenizer object with `encode` function.
+ * @param {number} maxTokens - Maximum token limit per chunk.
+ * @param {number} buffer - Token buffer to leave free in each chunk.
+ * @returns {LabeledChunks} - Object containing labeled text chunks with metadata.
+ */
 export function createChunksPreservingId(
   sentencesWithIds: SentenceWithId[],
   tokenizer: { encode: (s: string) => { length: number } | any[] },
@@ -149,7 +161,12 @@ export function createChunksPreservingId(
   return assignLabeledChunks(chunks);
 }
 
-// Assign labeled structure
+/**
+ * Assigns metadata and formatting to chunks of sentences.
+ *
+ * @param {SentenceWithId[][]} chunksWithIds - Array of sentence chunks.
+ * @returns {LabeledChunks} - Object with formatted passages, info, and character ranges.
+ */
 function assignLabeledChunks(chunksWithIds: SentenceWithId[][]): LabeledChunks {
   const labeled: LabeledChunks = {};
 
@@ -200,49 +217,68 @@ export function get_combined_prompt(text: string | null) {
 
   return combined_prompt;
 }
-
-
+/**
+ * Retrieve a passage, its chunk key, and character range from labeled chunks by sentence ID.
+ * 
+ * @param {LabeledChunks} labeledChunks - The object containing labeled chunks.
+ * @param {number} id - The sentence ID to find.
+ * @returns {[string, string, [number, number]] | undefined} - The passage string, chunk key, and char range, or undefined if not found.
+ */
 export function retrievePassageByCiteId(
   labeledChunks: LabeledChunks,
   id: number
 ) {
-  for (const [key,chunk ] of Object.entries(labeledChunks)) {
+  for (const [key, chunk] of Object.entries(labeledChunks)) {
     const start = chunk.info[1];
     const end = chunk.info[0] + chunk.info[1];
 
     if (id >= start && id < end) {
-       const index = id - start
-      
-      return [chunk.passages[index], key,chunk.char_range[index]];
+      const index = id - start;
+      return [chunk.passages[index], key, chunk.char_range[index]];
     }
-    
   }
-
   return undefined; // not found
 }
 
-export interface passacesCites{
-  [id: string] :  {sen:string, range: [number,number]}
-      
-    
+/**
+ * Interface defining a mapping from ID strings to passages and their character ranges.
+ */
+export interface passacesCites {
+  [id: string]: {
+    sen: string;          // The passage text with ID label
+    range: [number, number]; // Character range in original text
+  };
 }
 
-export function retrieveAllPassageByCiteId(labeledChunks:LabeledChunks, ids:number[] ){
-    const passages_cites:passacesCites= {}
-    for (const id of ids){
-       const result = retrievePassageByCiteId(labeledChunks,id)
-       passages_cites[id] = {
-        sen: result?.[0],
-        range: result?.[2]
-       }
-      
-
-    }
-
-    return passages_cites
-    
+/**
+ * Retrieve multiple passages and their character ranges from labeled chunks by a list of sentence IDs.
+ * 
+ * @param {LabeledChunks} labeledChunks - The labeled chunks containing passages.
+ * @param {number[]} ids - Array of sentence IDs to retrieve.
+ * @returns {passacesCites} - Object mapping each ID to its passage text and character range.
+ */
+export function retrieveAllPassageByCiteId(
+  labeledChunks: LabeledChunks,
+  ids: number[]
+): passacesCites {
+  const passages_cites: passacesCites = {};
+  for (const id of ids) {
+    const result = retrievePassageByCiteId(labeledChunks, id);
+    passages_cites[id] = {
+      sen: result?.[0],
+      range: result?.[2]
+    };
+  }
+  return passages_cites;
 }
 
+/**
+ * Extracts numbers from square-bracketed citations in a text.
+ * For example, from "hello [1, 2, 5] how [3,4]" it returns [1, 2, 5, 3, 4].
+ * 
+ * @param {string} text - The text containing citation numbers.
+ * @returns {number[]} - Array of numbers extracted from citations.
+ */
 export function findNumbers(text: string): number[] {
   const regex = /\[(\d+(?:,\s*\d+)*)\]/g;
   const result: number[] = [];

@@ -13,7 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useGlobalContext } from "../context/globalcontext"
 import { getHighlightsForCiteIds } from "@/actions/highlight-util"
 
-
 interface SummarizeProps {
   filename?: string
   url?: string
@@ -21,20 +20,19 @@ interface SummarizeProps {
   onNavigateToCitation?: (citation: string) => void
 }
 
-
- 
 export function Summarize({ filename, url, title, onNavigateToCitation }: SummarizeProps) {
-
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState<boolean>(false)
   const [activeTab, setActiveTab] = useState<string>("summary")
   const contentRef = useRef<HTMLDivElement>(null)
- const {summary,setSummary,citeHighlights,setCiteHiglights,loadedPdfDocument} =useGlobalContext()
 
+  // global context values
+  const { summary, setSummary, setCiteHiglights, loadedPdfDocument } = useGlobalContext()
 
-
-  
+  /**
+   * Fetch summary and citation highlights from backend
+   */
   const fetchSummary = async () => {
     if (!filename && !url) {
       setError("Please provide a file or URL to summarize")
@@ -49,11 +47,15 @@ export function Summarize({ filename, url, title, onNavigateToCitation }: Summar
       if (filename) formData.append("filename", filename)
       if (url) formData.append("url", url)
 
-     const result = await getSummary(formData)
-    setSummary(result.allsummary)
+      const result = await getSummary(formData)
+      setSummary(result.allsummary)
 
-    //   const getciteHiglights = await  getHighlightsForCiteIds(loadedPdfDocument!,result.chunkswitlables,result.allsummary)
-    //   setCiteHiglights(getciteHiglights)
+      const getciteHiglights = await getHighlightsForCiteIds(
+        loadedPdfDocument!, 
+        result.chunkswitlables,  
+        result.allsummary 
+      )
+      setCiteHiglights(getciteHiglights)
     } catch (err) {
       console.error("Error fetching summary:", err)
       setError("Failed to generate summary. Please try again.")
@@ -62,21 +64,19 @@ export function Summarize({ filename, url, title, onNavigateToCitation }: Summar
     }
   }
 
+  // copy summary to clipboard
   const copyToClipboard = () => {
     navigator.clipboard.writeText(summary)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleCitationClick = (citation: string) => {
-    if (onNavigateToCitation) {
-      onNavigateToCitation(citation)
-    }
-  }
+
 
   return (
     <Card className="w-full h-full flex flex-col">
       <CardHeader className="pb-2">
+        {/* title and action buttons */}
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
@@ -105,17 +105,22 @@ export function Summarize({ filename, url, title, onNavigateToCitation }: Summar
         </div>
         <CardDescription>AI-generated summary of your document</CardDescription>
       </CardHeader>
+
+      {/* main content */}
       <CardContent className="flex-1 overflow-hidden p-0">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
           <div className="px-6 pt-2">
+            {/* summary/citation toggle */}
             <TabsList className="grid grid-cols-2">
               <TabsTrigger value="summary">Summary</TabsTrigger>
-              <TabsTrigger value="citations">Citations</TabsTrigger>
+              {/* <TabsTrigger value="citations">Citations</TabsTrigger> */}
             </TabsList>
           </div>
 
+          {/* summary tab */}
           <TabsContent value="summary" className="flex-1 overflow-hidden p-6 pt-4">
             {isLoading ? (
+              // show loading skeleton
               <div className="space-y-2">
                 <Skeleton className="h-4 w-full" />
                 <Skeleton className="h-4 w-[90%]" />
@@ -124,16 +129,19 @@ export function Summarize({ filename, url, title, onNavigateToCitation }: Summar
                 <Skeleton className="h-4 w-[70%]" />
               </div>
             ) : error ? (
+              // show error
               <div className="p-4 bg-red-50 text-red-600 rounded-md">
                 <p>{error}</p>
               </div>
             ) : summary ? (
+              // show summary
               <ScrollArea className="h-full pr-4" ref={contentRef}>
-                 <div className="prose prose-sm max-w-none dark:prose-invert">
+                <div className="prose prose-sm max-w-none dark:prose-invert">
                   <MathRenderer text={summary} />
                 </div>
               </ScrollArea>
             ) : (
+              // no summary yet
               <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground h-full">
                 <FileText className="h-10 w-10 mb-2 opacity-50" />
                 <p>No summary available</p>
@@ -142,7 +150,8 @@ export function Summarize({ filename, url, title, onNavigateToCitation }: Summar
             )}
           </TabsContent>
 
-          <TabsContent value="citations" className="flex-1 overflow-hidden p-6 pt-4">
+          {/* citations tab */}
+         {/*<TabsContent value="citations" className="flex-1 overflow-hidden p-6 pt-4">
             <ScrollArea className="h-full pr-4">
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Citations</h3>
@@ -152,8 +161,8 @@ export function Summarize({ filename, url, title, onNavigateToCitation }: Summar
 
                 {summary ? (
                   <div className="space-y-2 mt-4">
-                    {/* Extract citations from summary and display them */}
-                    {Array.from(summary.matchAll(/\[(\d+)\]/g)).map((match, index) => {
+                    {/* extract and show all citations */}
+                    {/* {Array.from(summary.matchAll(/\[(\d+)\]/g)).map((match, index) => {
                       const citationNumber = match[1]
                       return (
                         <div key={index} className="p-3 border rounded-md">
@@ -182,7 +191,9 @@ export function Summarize({ filename, url, title, onNavigateToCitation }: Summar
                 )}
               </div>
             </ScrollArea>
-          </TabsContent>
+          </TabsContent> */}
+
+          
         </Tabs>
       </CardContent>
     </Card>

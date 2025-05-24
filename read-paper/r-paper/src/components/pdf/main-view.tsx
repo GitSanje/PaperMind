@@ -22,21 +22,21 @@ import {
   BookOpen,
   BrainCircuit,
   Sparkles,
+  LinkIcon,
 } from "lucide-react";
 
 import PDFViewer from "@/components/pdf/pdf-viewer";
 import NotesList from "@/components/pdf/notes-list";
 
 import { Sidebar } from "@/components/pdf/highlight-sidebar";
-// import { SelectionPopup } from "@/components/pdf/selection-popup"
-// import { DictionaryLookup } from "@/components/pdf/dictionary-lookup"
+
 import { AskAI } from "@/components/pdf/ask-ai";
 import { useGlobalContext } from "../context/globalcontext";
 import { DictionaryLookup } from "./dictionary-lookup";
 import { SelectionPopup } from "./selection-popup";
 
 import { Summarize } from "./summerize";
-import MathRenderer from "./markdown";
+import { Input } from "../ui/input";
 
 
 const highlightOptions = [
@@ -67,37 +67,37 @@ export default function PDFViewerPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
-   const [url, setUrl] = useState<string>("");
-
+  const [url, setUrl] = useState<string>("");
+  const [isurl, IsSetUrl] = useState<boolean>(false);
   const [selectionPosition, setSelectionPosition] = useState({ x: 0, y: 0 });
   const [dictionaryWord, setDictionaryWord] = useState("");
 
+  const {
+    isSelecting,
+    setIsSelecting,
+    pagehighlights,
+    setHighlights,
+    handleDeleteHighlight,
+    selectedText,
+    tab,
+    setTab,
+    setSelectedText,
+    setShowSelectionPopup,
+    showSelectionPopup,
+    aiQuery,
+    handleAskAI,
+    setAiQuery,
+  } = useGlobalContext();
 
-  const {  isSelecting,
-        setIsSelecting,
-        pagehighlights,
-        setHighlights,
-        handleDeleteHighlight,
-        selectedText,
-        tab,
-        setTab,
-        setSelectedText,
-        setShowSelectionPopup,
-        showSelectionPopup,
-        aiQuery,
-      handleAskAI,
-    setAiQuery } =
-    useGlobalContext();
-
-    useEffect(() => {
-        if (file) {
-          const url = URL.createObjectURL(file);
-          setUrl(url);
-          return () => {
-            URL.revokeObjectURL(url);
-          };
-        }
-      }, [file]);
+  useEffect(() => {
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setUrl(url);
+      return () => {
+        URL.revokeObjectURL(url);
+      };
+    }
+  }, [file]);
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
@@ -105,8 +105,6 @@ export default function PDFViewerPage() {
       setNotes([]);
     }
   };
-
-
 
   const handleAddNote = () => {
     if (!file) return;
@@ -203,7 +201,6 @@ export default function PDFViewerPage() {
 
   // Handle AI query
 
-
   useEffect(() => {
     if (totalPages > 0 && pdfContainerRef.current) {
       const timeout = setTimeout(() => {
@@ -246,8 +243,8 @@ export default function PDFViewerPage() {
 
   return (
     <div className="container mx-auto py-6 max-w-7xl">
-      <h1 className="text-3xl font-bold mb-6">PDF Viewer & Annotator</h1>
-      {/* <MathRenderer/> */}
+      <h1 className="text-3xl font-bold mb-6">PDF Reader</h1>
+   
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between mb-4">
@@ -274,7 +271,7 @@ export default function PDFViewerPage() {
               )}
             </div>
 
-            {file && (
+            {/* {file && (
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
@@ -292,10 +289,10 @@ export default function PDFViewerPage() {
                   <ZoomIn className="h-4 w-4" />
                 </Button>
               </div>
-            )}
+            )} */}
           </div>
 
-          {file ? (
+          {file || isurl ? (
             <Card className="border rounded-lg overflow-hidden">
               <CardContent className="p-0 relative">
                 <div className="h-[600px]" ref={pdfContainerRef}>
@@ -307,7 +304,6 @@ export default function PDFViewerPage() {
                     scale={scale}
                     activeHighlightColor={activeHighlightColor}
                     onTextSelection={handleTextSelection}
-                    
                   />
                 </div>
                 {showSelectionPopup && (
@@ -330,6 +326,27 @@ export default function PDFViewerPage() {
                   Upload a PDF to get started with highlighting and note-taking
                 </p>
                 <Button onClick={triggerFileInput}>Select PDF File</Button>
+                    
+                    <p className="text-muted-foreground mb-4"> or  </p>
+                    
+                 <div className="space-y-2 mb-4">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter PDF URL (e.g., https://example.com/document.pdf)"
+                    value={url}
+                     onChange={(e) => setUrl(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter"}
+                    className="flex-1"
+                  />
+                  <Button className="gap-2" onClick={() => IsSetUrl(true)}>
+                    <LinkIcon className="h-4 w-4" />
+                    Load PDF
+                    {/* {isLoadingUrl ? "Loading..." : "Load PDF"} */}
+                  </Button>
+                </div>
+                {/* {urlError && <p className="text-sm text-red-600">{urlError}</p>}
+                {pdfUrl && <p className="text-sm text-muted-foreground truncate">Loaded: {pdfUrl}</p>} */}
+              </div>
               </div>
             </div>
           )}
@@ -387,18 +404,27 @@ export default function PDFViewerPage() {
         <div className="space-y-4">
           <Tabs value={tab} onValueChange={setTab} className="w-full">
             <TabsList className="grid grid-cols-4 ">
-              <TabsTrigger value="tool" className="text-indigo-600">Tools</TabsTrigger>
-              <TabsTrigger value="highlights" className="text-indigo-600">Highlights</TabsTrigger>
-              <TabsTrigger value="summerize" className="flex items-center gap-1 text-indigo-600">
-                        <Sparkles className="h-4 w-4" />
-                          Summerize
-                        </TabsTrigger>
-           
-              <TabsTrigger value="ai" className="flex items-center gap-1 text-indigo-600">
+              <TabsTrigger value="tool" className="text-indigo-600">
+                Tools
+              </TabsTrigger>
+              <TabsTrigger value="highlights" className="text-indigo-600">
+                Highlights
+              </TabsTrigger>
+              <TabsTrigger
+                value="summerize"
+                className="flex items-center gap-1 text-indigo-600"
+              >
+                <Sparkles className="h-4 w-4" />
+                Summerize
+              </TabsTrigger>
+
+              <TabsTrigger
+                value="ai"
+                className="flex items-center gap-1 text-indigo-600"
+              >
                 <BrainCircuit className="h-4 w-4" />
                 Ask AI
               </TabsTrigger>
-            
             </TabsList>
 
             <TabsContent value="tool" className="space-y-4">
@@ -460,8 +486,7 @@ export default function PDFViewerPage() {
                         <BookOpen className="h-4 w-4" />
                         Dictionary
                       </TabsTrigger>
-                         <TabsTrigger value="notes">Notes</TabsTrigger>
-                         
+                      <TabsTrigger value="notes">Notes</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="dictionary">
@@ -470,48 +495,47 @@ export default function PDFViewerPage() {
                         setWord={setDictionaryWord}
                       />
                     </TabsContent>
-                        <TabsContent value="notes">
-              <Card>
-                <CardContent className="p-4">
-                  <h3 className="font-medium mb-3">Your Notes</h3>
-                  <div className="p-4 border rounded-lg">
-                    <h3 className="font-medium mb-3">Add Note</h3>
-                    <Textarea
-                      placeholder="Type your note here..."
-                      value={currentNote}
-                      onChange={(e) => setCurrentNote(e.target.value)}
-                      className="mb-3"
-                      rows={4}
-                    />
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        For page {currentPage}
-                      </span>
-                      <Button
-                        onClick={handleAddNote}
-                        size="sm"
-                        className="gap-1"
-                        disabled={!file}
-                      >
-                        <Plus className="h-4 w-4" />
-                        Add Note
-                      </Button>
-                    </div>
-                  </div>
-                  <Separator className="my-2" />
+                    <TabsContent value="notes">
+                      <Card>
+                        <CardContent className="p-4">
+                          <h3 className="font-medium mb-3">Your Notes</h3>
+                          <div className="p-4 border rounded-lg">
+                            <h3 className="font-medium mb-3">Add Note</h3>
+                            <Textarea
+                              placeholder="Type your note here..."
+                              value={currentNote}
+                              onChange={(e) => setCurrentNote(e.target.value)}
+                              className="mb-3"
+                              rows={4}
+                            />
+                            <div className="flex justify-between">
+                              <span className="text-sm text-muted-foreground">
+                                For page {currentPage}
+                              </span>
+                              <Button
+                                onClick={handleAddNote}
+                                size="sm"
+                                className="gap-1"
+                                disabled={!file}
+                              >
+                                <Plus className="h-4 w-4" />
+                                Add Note
+                              </Button>
+                            </div>
+                          </div>
+                          <Separator className="my-2" />
 
-                  <ScrollArea className="h-[500px] pr-4">
-                    <NotesList
-                      notes={notes}
-                      onDeleteNote={handleDeleteNote}
-                      onJumpToPage={handleJumpToPage}
-                      currentPage={currentPage}
-                    />
-                  </ScrollArea>
-                </CardContent>
-              </Card>
-            </TabsContent>
-                    
+                          <ScrollArea className="h-[500px] pr-4">
+                            <NotesList
+                              notes={notes}
+                              onDeleteNote={handleDeleteNote}
+                              onJumpToPage={handleJumpToPage}
+                              currentPage={currentPage}
+                            />
+                          </ScrollArea>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
                   </Tabs>
                 </CardContent>
               </Card>
@@ -525,12 +549,17 @@ export default function PDFViewerPage() {
               />
             </TabsContent>
 
-             <TabsContent value="summerize">
+            <TabsContent value="summerize">
               <Card>
                 <CardContent className="p-4 max-h-[600px] overflow-y-auto">
-                 {
-                  file ?  <Summarize filename={file?.name as string} url={undefined }/>: 'Upload file to summerize'
-                 } 
+                  {file || url? (
+                    <Summarize
+                      filename={file?.name as string}
+                      url={url}
+                    />
+                  ) : (
+                    "Upload file to summerize"
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -538,11 +567,15 @@ export default function PDFViewerPage() {
             <TabsContent value="ai">
               <Card>
                 <CardContent className="p-4 max-h-[600px] overflow-y-auto">
-                  <AskAI query={aiQuery} setQuery={setAiQuery} file= {file!} url = {url}/>
+                  <AskAI
+                    query={aiQuery}
+                    setQuery={setAiQuery}
+                    file={file!}
+                    url={url}
+                  />
                 </CardContent>
               </Card>
             </TabsContent>
-            
           </Tabs>
         </div>
       </div>

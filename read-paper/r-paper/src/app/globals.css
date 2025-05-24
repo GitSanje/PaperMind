@@ -209,3 +209,10 @@
 .citation-box {
   @apply inline-block mx-0.5 px-1 py-0.5 border border-indigo-700 rounded text-indigo-700 text-xs font-medium align-middle;
 }
+
+
+.katex-display {
+  margin: 1em 0;
+  text-align: center;
+  font-size: 1.2em; /* slightly larger */
+}
