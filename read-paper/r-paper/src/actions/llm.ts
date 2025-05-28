@@ -8,16 +8,20 @@ import {
   GoogleGenerativeAIEmbeddings,
 } from "@langchain/google-genai";
 import { TaskType } from "@google/generative-ai";
-import { FaissStore } from "@langchain/community/vectorstores/faiss";
+import { Blob as NodeBlob } from "buffer";
 import { pull } from "langchain/hub";
 import { Annotation, StateGraph } from "@langchain/langgraph";
 import { Document } from "langchain/document";
 import { MemoryVectorStore } from "langchain/vectorstores/memory";
 import * as jschardet from "jschardet";
+import axios from "axios";
+import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
 // Load and index documents from a URL
 async function loadRag(url?: string, file?: File) {
   try {
-    if (!file || !url) {
+     
+    if (!file && !url) {
+          
       return null;
     }
     const splitter = new RecursiveCharacterTextSplitter({
@@ -25,7 +29,9 @@ async function loadRag(url?: string, file?: File) {
       chunkOverlap: 50,
     });
     let docSplits;
+
     if (file) {
+   
       const buffer = Buffer.from(await file.arrayBuffer());
 
       let text = "";
@@ -57,11 +63,14 @@ async function loadRag(url?: string, file?: File) {
       }
       docSplits = await splitter.createDocuments([text]);
     } else {
-      const loader = new CheerioWebBaseLoader(url);
+     
+    const response = await axios.get(url!, { responseType: "arraybuffer" });
+    const blob = new NodeBlob([response.data], { type: "application/pdf" });
+    const loader = new PDFLoader(blob as Blob, { splitPages: true });
       const rawDocs = await loader.load();
       docSplits = await splitter.splitDocuments(rawDocs);
     }
-   
+
     const embeddings = new GoogleGenerativeAIEmbeddings({
       model: "gemini-embedding-exp-03-07",
       taskType: TaskType.RETRIEVAL_DOCUMENT,

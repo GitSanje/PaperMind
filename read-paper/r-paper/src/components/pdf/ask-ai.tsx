@@ -15,6 +15,7 @@ import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism"
 import "katex/dist/katex.min.css"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
+import MathRenderer from "./markdown"
 
 interface AskAIProps {
   query: string
@@ -146,26 +147,7 @@ export function AskAI({ query, setQuery, file, url }: AskAIProps) {
                       <span className="font-medium">AI Assistant</span>
                     </div>
                     <div className="prose prose-sm max-w-none dark:prose-invert">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm, remarkMath]}
-                        rehypePlugins={[rehypeKatex]}
-                        components={{
-                          code({ node, inline, className, children, ...props }) {
-                            const match = /language-(\w+)/.exec(className || "")
-                            return !inline && match ? (
-                              <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div" {...props}>
-                                {String(children).replace(/\n$/, "")}
-                              </SyntaxHighlighter>
-                            ) : (
-                              <code className={className} {...props}>
-                                {children}
-                              </code>
-                            )
-                          },
-                        }}
-                      >
-                        {streamingResponse}
-                      </ReactMarkdown>
+                      <MathRenderer text={streamingResponse}/>
                     </div>
                     <div className="h-4 w-4 mt-1">
                       <span className="inline-block h-2 w-2 bg-primary rounded-full animate-pulse"></span>
@@ -238,26 +220,7 @@ function MessageBubble({ message, index, onCopy, copied }: MessageBubbleProps) {
 
           {message.role === "ai" ? (
             <div className="prose prose-sm max-w-none dark:prose-invert">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm, remarkMath]}
-                rehypePlugins={[rehypeKatex]}
-                components={{
-                  code({ node, inline, className, children, ...props }) {
-                    const match = /language-(\w+)/.exec(className || "")
-                    return !inline && match ? (
-                      <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div" {...props}>
-                        {String(children).replace(/\n$/, "")}
-                      </SyntaxHighlighter>
-                    ) : (
-                      <code className={className} {...props}>
-                        {children}
-                      </code>
-                    )
-                  },
-                }}
-              >
-                {message.content}
-              </ReactMarkdown>
+            <MathRenderer text={message.content}/>
             </div>
           ) : (
             <p className="whitespace-pre-wrap">{message.content}</p>

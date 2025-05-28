@@ -104,9 +104,7 @@ export function CustomHighlight({
       setShowPopup(false);
     }
   };
-// console.log('====================================');
-// console.log(highlight,'custom highlight');
-// console.log('====================================');
+
   return (
     <div
       className={` relative  ${
@@ -154,7 +152,8 @@ export function CustomHighlight({
           />
          ))
           :
-                <div
+          isScrolledTo && 
+              (  <div
             onMouseOver={onMouseOver}
             onMouseOut={onMouseOut}
             onClick={(e) => {
@@ -167,12 +166,11 @@ export function CustomHighlight({
             
             style={{
               ...boundingRect,
-              backgroundColor: isScrolledTo
-          ?hexToRgba( "#ff4141",0.5): highlightColor || highlight.color|| "bg-red-700",
+              backgroundColor:  " rgba(255, 226, 143, 1)",
             }}
             className="Highlight__part"
           /> 
-          
+          )
 
         } 
       

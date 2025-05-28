@@ -375,9 +375,9 @@ export default function PDFViewer({
         </PdfLoader>
 
         {/* Page indicator overlay */}
-        <div className="sticky top-0 left-0 z-10 bg-white/80 backdrop-blur-sm text-xs py-1 px-2 rounded-br-md shadow-sm">
+        {/* <div className="sticky top-0 left-0 z-10 bg-white/80 backdrop-blur-sm text-xs py-1 px-2 rounded-br-md shadow-sm">
           Page {currentPage} of {loadedPdfDocument?.numPages || "?"}
-        </div>
+        </div> */}
       </div>
     </div>
   );
