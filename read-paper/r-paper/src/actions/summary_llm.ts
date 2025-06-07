@@ -5,7 +5,6 @@ import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { PromptTemplate } from "@langchain/core/prompts";
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
 import axios from "axios";
 import { Blob as NodeBlob } from "buffer";
 import {  createChunksPreservingId, get_chunks_with_ids, get_combined_prompt, get_splitter, LabeledChunks, PageDict, tokenizer } from "./utils";

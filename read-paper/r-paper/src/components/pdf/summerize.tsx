@@ -1,77 +1,112 @@
-"use client"
+"use client";
 
-import { useState, useRef, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Sparkles, FileText, Copy, CheckCheck, RefreshCw, ExternalLink } from "lucide-react"
-import "katex/dist/katex.min.css"
-import { Skeleton } from "@/components/ui/skeleton"
-import { getSummary } from "@/actions/summary_llm"
-import MathRenderer from "./markdown"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useGlobalContext } from "../context/globalcontext"
-import { getHighlightsForCiteIds } from "@/actions/highlight-util"
+import { useState, useRef, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import {
+  Sparkles,
+  FileText,
+  Copy,
+  CheckCheck,
+  RefreshCw,
+  ExternalLink,
+} from "lucide-react";
+import "katex/dist/katex.min.css";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getSummary } from "@/actions/summary_llm";
+import MathRenderer from "./markdown";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useGlobalContext } from "../context/globalcontext";
+import { getHighlightsForCiteIds } from "@/actions/highlight-util";
+import { LabeledChunks } from "@/actions/utils";
+import { addCiteHighlight, setSummary } from "../../../redux/pdfSlice";
+import { useAppDispatch, useAppSelector } from "../../../redux/hooks";
 
 interface SummarizeProps {
-  filename?: string
-  url?: string
-  title?: string
-  onNavigateToCitation?: (citation: string) => void
+  filename?: string;
+  url?: string;
+  title?: string;
+  onNavigateToCitation?: (citation: string) => void;
 }
 
-export function Summarize({ filename, url, title, onNavigateToCitation }: SummarizeProps) {
-  const [isLoading, setIsLoading] = useState<boolean>(false)
-  const [error, setError] = useState<string | null>(null)
-  const [copied, setCopied] = useState<boolean>(false)
-  const [activeTab, setActiveTab] = useState<string>("summary")
-  const contentRef = useRef<HTMLDivElement>(null)
+export function Summarize({
+  filename,
+  url,
+  title,
+  onNavigateToCitation,
+}: SummarizeProps) {
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<string>("summary");
+  const contentRef = useRef<HTMLDivElement>(null);
+const dispatch= useAppDispatch()
+  const [labelschunks, setLabelschunks] = useState<LabeledChunks | null>();
+   const {loadedPdfDocument} = useGlobalContext()
+  const summary = useAppSelector((state) => state.pdfsetting.summary)
 
-  // global context values
-  const { summary, setSummary, setCiteHiglights, loadedPdfDocument } = useGlobalContext()
+
+  // useEffect(() => {
+  //   if (labelschunks && summary) {
+  //     const getciteHiglights = async () => {
+  //       const highlightciteResults = await getHighlightsForCiteIds(
+  //         loadedPdfDocument!,
+  //         labelschunks,
+  //         summary
+  //       );
+  //       setCiteHiglights(highlightciteResults);
+  //     };
+  //     getciteHiglights()
+  //   }
+  // }, [labelschunks, summary]);
 
   /**
    * Fetch summary and citation highlights from backend
    */
   const fetchSummary = async () => {
     if (!filename && !url) {
-      setError("Please provide a file or URL to summarize")
-      return
+      setError("Please provide a file or URL to summarize");
+      return;
     }
 
-    setIsLoading(true)
-    setError(null)
+    setIsLoading(true);
+    setError(null);
 
     try {
-      const formData = new FormData()
-      if (filename) formData.append("filename", filename)
-      if (url) formData.append("url", url)
+      const formData = new FormData();
+      if (filename) formData.append("filename", filename);
+      if (url) formData.append("url", url);
 
-      const result = await getSummary(formData)
-      setSummary(result.allsummary)
-
-      const getciteHiglights = await getHighlightsForCiteIds(
-        loadedPdfDocument!, 
-        result.chunkswitlables,  
-        result.allsummary 
-      )
-      setCiteHiglights(getciteHiglights)
+      const result = await getSummary(formData);
+      dispatch(setSummary(result.allsummary));
+      // setLabelschunks(result.chunkswitlables);
+             const highlightciteResults = await getHighlightsForCiteIds(
+          loadedPdfDocument!,
+          result.chunkswitlables!,
+          result.allsummary
+        );
+        dispatch(addCiteHighlight(highlightciteResults));
     } catch (err) {
-      console.error("Error fetching summary:", err)
-      setError("Failed to generate summary. Please try again.")
+      console.error("Error fetching summary:", err);
+      setError("Failed to generate summary. Please try again.");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   // copy summary to clipboard
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(summary)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-
+    navigator.clipboard.writeText(summary);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <Card className="w-full h-full flex flex-col">
@@ -81,13 +116,27 @@ export function Summarize({ filename, url, title, onNavigateToCitation }: Summar
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
             <CardTitle className="text-lg">
-              {title || (filename ? filename : url ? "URL Summary" : "Document Summary")}
+              {title ||
+                (filename
+                  ? filename
+                  : url
+                  ? "URL Summary"
+                  : "Document Summary")}
             </CardTitle>
           </div>
           <div className="flex gap-2">
             {summary && (
-              <Button size="sm" variant="ghost" className="h-8 px-2" onClick={copyToClipboard}>
-                {copied ? <CheckCheck className="h-4 w-4 text-green-500 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 px-2"
+                onClick={copyToClipboard}
+              >
+                {copied ? (
+                  <CheckCheck className="h-4 w-4 text-green-500 mr-1" />
+                ) : (
+                  <Copy className="h-4 w-4 mr-1" />
+                )}
                 {copied ? "Copied" : "Copy"}
               </Button>
             )}
@@ -98,7 +147,9 @@ export function Summarize({ filename, url, title, onNavigateToCitation }: Summar
               onClick={fetchSummary}
               disabled={isLoading || (!filename && !url)}
             >
-              <RefreshCw className={`h-4 w-4 mr-1 ${isLoading ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`h-4 w-4 mr-1 ${isLoading ? "animate-spin" : ""}`}
+              />
               Generate
             </Button>
           </div>
@@ -108,7 +159,11 @@ export function Summarize({ filename, url, title, onNavigateToCitation }: Summar
 
       {/* main content */}
       <CardContent className="flex-1 overflow-hidden p-0">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="h-full flex flex-col"
+        >
           <div className="px-6 pt-2">
             {/* summary/citation toggle */}
             <TabsList className="grid grid-cols-2">
@@ -118,7 +173,10 @@ export function Summarize({ filename, url, title, onNavigateToCitation }: Summar
           </div>
 
           {/* summary tab */}
-          <TabsContent value="summary" className="flex-1 overflow-hidden p-6 pt-4">
+          <TabsContent
+            value="summary"
+            className="flex-1 overflow-hidden p-6 pt-4"
+          >
             {isLoading ? (
               // show loading skeleton
               <div className="space-y-2">
@@ -145,13 +203,15 @@ export function Summarize({ filename, url, title, onNavigateToCitation }: Summar
               <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground h-full">
                 <FileText className="h-10 w-10 mb-2 opacity-50" />
                 <p>No summary available</p>
-                <p className="text-sm mt-1">Click "Generate" to create a summary of your document</p>
+                <p className="text-sm mt-1">
+                  Click "Generate" to create a summary of your document
+                </p>
               </div>
             )}
           </TabsContent>
 
           {/* citations tab */}
-         {/*<TabsContent value="citations" className="flex-1 overflow-hidden p-6 pt-4">
+          {/*<TabsContent value="citations" className="flex-1 overflow-hidden p-6 pt-4">
             <ScrollArea className="h-full pr-4">
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Citations</h3>
@@ -162,7 +222,7 @@ export function Summarize({ filename, url, title, onNavigateToCitation }: Summar
                 {summary ? (
                   <div className="space-y-2 mt-4">
                     {/* extract and show all citations */}
-                    {/* {Array.from(summary.matchAll(/\[(\d+)\]/g)).map((match, index) => {
+          {/* {Array.from(summary.matchAll(/\[(\d+)\]/g)).map((match, index) => {
                       const citationNumber = match[1]
                       return (
                         <div key={index} className="p-3 border rounded-md">
@@ -192,10 +252,8 @@ export function Summarize({ filename, url, title, onNavigateToCitation }: Summar
               </div>
             </ScrollArea>
           </TabsContent> */}
-
-          
         </Tabs>
       </CardContent>
     </Card>
-  )
+  );
 }

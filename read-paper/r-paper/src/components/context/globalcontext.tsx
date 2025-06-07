@@ -8,6 +8,7 @@ import type {
   IHighlight,
   ScaledPosition,
 } from "react-pdf-highlighter";
+import { useAppDispatch } from "../../../redux/hooks";
 
 export interface HighlightType extends IHighlight {
   color?: string;
@@ -21,14 +22,7 @@ interface ContextProps {
   setHighlights: React.Dispatch<React.SetStateAction<HighlightType[]>>;
   citeHighlights: HighlightType[];
   setCiteHiglights: React.Dispatch<React.SetStateAction<HighlightType[]>>;
-  handleDeleteHighlight: (id: string) => void;
-  updateHighlightColor: (id: string, color: string) => void;
-  updateHighlight: (
-    highlightId: string,
-    position: Partial<ScaledPosition>,
-    content: Partial<Content>,
-    color?: string
-  ) => void;
+  
   tab: string;
   setTab: (tab: string) => void;
   showSelectionPopup: boolean;
@@ -89,27 +83,14 @@ export const GlobalContextProvider = ({
   const [activeCiteHighlights, setActiveCiteHighlights] = useState<
     HighlightType | undefined
   >();
-
-  /**
-   * Deletes a highlight based on its unique ID.
-   * @param {string} id - Highlight ID to delete
-   */
-  const handleDeleteHighlight = (id: string) => {
-    setHighlights(pagehighlights.filter((h) => h.id !== id));
-  };
+  
+   
 
   /**
    * Updates the color of an existing highlight.
    * @param {string} id - Highlight ID to update
    * @param {string} color - New color value
    */
-  const updateHighlightColor = (id: string, color: string) => {
-    setHighlights((prevHighlights) =>
-      prevHighlights.map((h) => {
-        return h.id === id ? { ...h, color } : h;
-      })
-    );
-  };
 
   /**
    * Updates an existing highlight's position and content,
@@ -149,6 +130,8 @@ export const GlobalContextProvider = ({
     );
   };
 
+  const dispatch = useAppDispatch()
+
   /**
    * Sets an AI query (either custom or from the selected text),
    * switches to the AI tab, and closes the popup.
@@ -168,9 +151,6 @@ export const GlobalContextProvider = ({
         setIsSelecting,
         pagehighlights,
         setHighlights,
-        handleDeleteHighlight,
-        updateHighlightColor,
-        updateHighlight,
         tab,
         setTab,
         selectedText,

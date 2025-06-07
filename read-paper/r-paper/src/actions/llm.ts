@@ -21,7 +21,6 @@ async function loadRag(url?: string, file?: File) {
   try {
      
     if (!file && !url) {
-          
       return null;
     }
     const splitter = new RecursiveCharacterTextSplitter({

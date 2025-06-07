@@ -37,6 +37,9 @@ import { SelectionPopup } from "./selection-popup";
 
 import { Summarize } from "./summerize";
 import { Input } from "../ui/input";
+import { deleteHighlight } from "../../../redux/highlightSlice";
+import { useAppDispatch, useAppSelector } from "../../../redux/hooks";
+import { setFile, setIsSelecting, setTab, setUrl } from "../../../redux/pdfSlice";
 
 
 const highlightOptions = [
@@ -49,7 +52,7 @@ const highlightOptions = [
 ];
 
 export default function PDFViewerPage() {
-  const [file, setFile] = useState<File | null>(null);
+
   const [notes, setNotes] = useState<
     Array<{
       id: string;
@@ -67,40 +70,29 @@ export default function PDFViewerPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
-  const [url, setUrl] = useState<string>("");
   const [isurl, IsSetUrl] = useState<boolean>(false);
   const [selectionPosition, setSelectionPosition] = useState({ x: 0, y: 0 });
   const [dictionaryWord, setDictionaryWord] = useState("");
 
   const {
-    isSelecting,
-    setIsSelecting,
+  
     pagehighlights,
     setHighlights,
-    handleDeleteHighlight,
     selectedText,
-    tab,
-    setTab,
     setSelectedText,
     setShowSelectionPopup,
     showSelectionPopup,
-    aiQuery,
     handleAskAI,
-    setAiQuery,
   } = useGlobalContext();
 
-  useEffect(() => {
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setUrl(url);
-      return () => {
-        URL.revokeObjectURL(url);
-      };
-    }
-  }, [file]);
+   const tab = useAppSelector((state) => state.pdfsetting.tab)
+   const isSelecting = useAppSelector((state) => state.pdfsetting.isSelecting)
+   const file = useAppSelector((state) => state.pdfsetting.file)
+   const url = useAppSelector((state) => state.pdfsetting.url)
+   const dispatch = useAppDispatch()
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+     dispatch( setFile(e.target.files[0]));
       setCurrentPage(1);
       setNotes([]);
     }
@@ -199,7 +191,7 @@ export default function PDFViewerPage() {
     setShowSelectionPopup(false);
   };
 
-  // Handle AI query
+ 
 
   useEffect(() => {
     if (totalPages > 0 && pdfContainerRef.current) {
@@ -240,7 +232,9 @@ export default function PDFViewerPage() {
       };
     }
   }, [totalPages, setCurrentPage, pdfContainerRef]);
-
+const handleTabChange = (newTab: string) => {
+    dispatch(setTab(newTab));
+  };
   return (
     <div className="container mx-auto py-6 max-w-7xl">
       <h1 className="text-3xl font-bold mb-6">PDF Reader</h1>
@@ -292,12 +286,13 @@ export default function PDFViewerPage() {
             )} */}
           </div>
 
-          {file || isurl ? (
+          {file || url ? (
             <Card className="border rounded-lg overflow-hidden">
               <CardContent className="p-0 relative">
                 <div className="h-[600px]" ref={pdfContainerRef}>
                   <PDFViewer
-                    url={url}
+                    url={url!}
+                    file={file!}
                     currentPage={currentPage}
                     setCurrentPage={setCurrentPage}
                     setTotalPages={setTotalPages}
@@ -333,8 +328,8 @@ export default function PDFViewerPage() {
                 <div className="flex gap-2">
                   <Input
                     placeholder="Enter PDF URL (e.g., https://example.com/document.pdf)"
-                    value={url}
-                     onChange={(e) => setUrl(e.target.value)}
+                    value={url!}
+                     onChange={(e) => dispatch(setUrl(e.target.value))}
                     onKeyDown={(e) => e.key === "Enter"}
                     className="flex-1"
                   />
@@ -402,7 +397,7 @@ export default function PDFViewerPage() {
         </div>
 
         <div className="space-y-4">
-          <Tabs value={tab} onValueChange={setTab} className="w-full">
+          <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
             <TabsList className="grid grid-cols-4 ">
               <TabsTrigger value="tool" className="text-indigo-600">
                 Tools
@@ -444,7 +439,7 @@ export default function PDFViewerPage() {
                           style={{ backgroundColor: option }}
                           onClick={() => {
                             setActiveHighlightColor(option);
-                            setIsSelecting(true);
+                            dispatch(setIsSelecting(true));
                           }}
                         />
                       );
@@ -459,7 +454,7 @@ export default function PDFViewerPage() {
                           }`}
                           title="Disable highlight mode"
                           onClick={() => {
-                            setIsSelecting(false);
+                            dispatch(setIsSelecting(false));
                           }}
                         >
                           <CircleSlash className="w-4 h-4" />
@@ -543,9 +538,9 @@ export default function PDFViewerPage() {
 
             <TabsContent value="highlights">
               <Sidebar
-                highlights={pagehighlights}
                 resetHighlights={resetHighlights}
-                onDeleteHighlight={handleDeleteHighlight}
+                ispdfAvailable={!!file|| isurl}
+               
               />
             </TabsContent>
 
@@ -555,7 +550,7 @@ export default function PDFViewerPage() {
                   {file || url? (
                     <Summarize
                       filename={file?.name as string}
-                      url={url}
+                      url={url!}
                     />
                   ) : (
                     "Upload file to summerize"
@@ -568,10 +563,8 @@ export default function PDFViewerPage() {
               <Card>
                 <CardContent className="p-4 max-h-[600px] overflow-y-auto">
                   <AskAI
-                    query={aiQuery}
-                    setQuery={setAiQuery}
                     file={file!}
-                    url={url}
+                    url={url!}
                   />
                 </CardContent>
               </Card>

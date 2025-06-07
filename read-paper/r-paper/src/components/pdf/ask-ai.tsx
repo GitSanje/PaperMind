@@ -16,15 +16,16 @@ import "katex/dist/katex.min.css"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import MathRenderer from "./markdown"
+import { useAppDispatch, useAppSelector } from "../../../redux/hooks"
+import { setAiQuery } from "../../../redux/pdfSlice"
 
 interface AskAIProps {
-  query: string
-  setQuery: (query: string) => void
+ 
   file?: File
   url?: string
 }
 
-export function AskAI({ query, setQuery, file, url }: AskAIProps) {
+export function AskAI({file, url }: AskAIProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [streamingResponse, setStreamingResponse] = useState("")
   const [conversation, setConversation] = useState<Array<{ role: "user" | "ai"; content: string }>>([])
@@ -36,6 +37,8 @@ export function AskAI({ query, setQuery, file, url }: AskAIProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [conversation, streamingResponse])
 
+  const dispatch = useAppDispatch()
+  const query = useAppSelector((state) => state.pdfsetting.aiQuery)
   // // Update query when prop changes
   // useEffect(() => {
   //   if (query && !conversation.some((msg) => msg.content === query)) {
@@ -81,7 +84,7 @@ export function AskAI({ query, setQuery, file, url }: AskAIProps) {
       await streamResponse()
 
       // Clear the input
-      setQuery("")
+      dispatch(setAiQuery(""))
     } catch (error) {
       console.error("Error getting AI response:", error)
       setConversation([
@@ -99,7 +102,7 @@ export function AskAI({ query, setQuery, file, url }: AskAIProps) {
 
   const clearConversation = () => {
     setConversation([])
-    setQuery("")
+         dispatch(setAiQuery(""))
     setStreamingResponse("")
   }
 
@@ -173,7 +176,7 @@ export function AskAI({ query, setQuery, file, url }: AskAIProps) {
         <Textarea
           placeholder="Ask a question about your PDF..."
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => dispatch(setAiQuery(e.target.value))}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault()

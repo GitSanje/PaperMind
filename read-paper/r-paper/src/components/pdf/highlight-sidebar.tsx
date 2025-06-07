@@ -6,11 +6,12 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { Trash2, BookOpen, ImageIcon } from 'lucide-react'
 import { Badge } from "@/components/ui/badge"
+import { deleteHighlight } from "../../../redux/highlightSlice"
+import { useAppSelector } from "../../../redux/hooks"
 
 interface SidebarProps {
-  highlights: Array<HighlightType>
+  ispdfAvailable:boolean
   resetHighlights?: () => void
- onDeleteHighlight?: (id: string) => void
   toggleDocument?: () => void
 }
 
@@ -18,7 +19,9 @@ const updateHash = (highlight: HighlightType) => {
   document.location.hash = `highlight-${highlight.id}`
 }
 
-export function Sidebar({ highlights, resetHighlights,onDeleteHighlight, toggleDocument }: SidebarProps) {
+
+export function Sidebar({ ispdfAvailable, resetHighlights, toggleDocument }: SidebarProps) {
+  const highlights = useAppSelector((state) => state.highlight.highlights)
   return (
     <div className="w-full bg-white rounded-lg border shadow-sm">
       <div className="p-4 border-b">
@@ -35,7 +38,7 @@ export function Sidebar({ highlights, resetHighlights,onDeleteHighlight, toggleD
         </p>
       </div>
 
-      {highlights.length  > 0 ? (
+      {highlights.length > 0   ? (
         <ScrollArea className="h-[400px]">
           <ul className="divide-y">
             {highlights.map((highlight, index) => (
@@ -87,12 +90,12 @@ export function Sidebar({ highlights, resetHighlights,onDeleteHighlight, toggleD
                       </Badge>
                     )}
                     <div className="">
-                   {onDeleteHighlight && (
+                   {deleteHighlight && (
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                        onClick={() => onDeleteHighlight(highlight.id)}
+                        onClick={() => deleteHighlight({id: highlight.id})}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

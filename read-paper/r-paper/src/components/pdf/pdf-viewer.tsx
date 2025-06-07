@@ -21,22 +21,23 @@ import type {
 } from "react-pdf-highlighter";
 export type T_ViewportHighlight<T_HT> = { position: Position } & T_HT;
 
-
 import { Spinner } from "../ui/spinner";
 import { useGlobalContext, HighlightType } from "../context/globalcontext";
 import { PDFDocumentProxy } from "pdfjs-dist";
 
 interface PDFViewerProps {
-  url: string;
+  url?: string;
+  file?: File;
   currentPage: number;
   setCurrentPage: (page: number) => void;
   setTotalPages: (pages: number) => void;
   scale: number;
   activeHighlightColor: string;
+
   onTextSelection?: (text: string, position: { x: number; y: number }) => void;
 }
 
-interface NewHighlightVarient extends NewHighlight {
+export interface NewHighlightVarient extends NewHighlight {
   color?: string;
 }
 
@@ -65,6 +66,13 @@ import { pdfjs } from "react-pdf";
 
 import { CustomHighlight } from "./custom-highlight";
 import { hexToRgba } from "@/lib/utils";
+import {
+  addHighlight,
+  concatHighlights,
+  updateHighlight,
+} from "../../../redux/highlightSlice";
+import { useAppDispatch, useAppSelector } from "../../../redux/hooks";
+import HighlightPopup from "./HighlightPopup";
 
 // Configure pdfjs worker to load from CDN
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -86,6 +94,7 @@ const PRIMARY_PDF_URL = "https://arxiv.org/pdf/1708.08021";
  */
 export default function PDFViewer({
   url,
+  file,
   currentPage,
   setCurrentPage,
   setTotalPages,
@@ -93,23 +102,23 @@ export default function PDFViewer({
   activeHighlightColor,
   onTextSelection,
 }: PDFViewerProps) {
+
+
   // Extract global context state and methods related to highlights and PDF document
-  const {
-    isSelecting,
-    pagehighlights,
-    setHighlights,
-    handleDeleteHighlight,
-    updateHighlightColor,
-    handleAskAI,
-    loadedPdfDocument,
-    setPdfDocument,
-    citeHighlights,
-    updateHighlight
-  } = useGlobalContext();
+  const { handleAskAI, loadedPdfDocument, setPdfDocument } = useGlobalContext();
+
+  const highlights = useAppSelector((state) => state.highlight.highlights);
+  const citeHighlights = useAppSelector(
+    (state) => state.pdfsetting.citeHighlights
+  );
+  const isSelecting = useAppSelector((state) => state.pdfsetting.isSelecting);
+  const pagehighlights = useAppSelector((state) => state.highlight.highlights);
+
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   // Ref to function that scrolls PDF viewer to a specific highlight
   const scrollViewerTo = useRef<(highlight: IHighlight) => void>(() => {});
-
+  const dispatch = useAppDispatch();
   // When the PDF document is loaded, update the total number of pages
   useEffect(() => {
     if (loadedPdfDocument) {
@@ -117,22 +126,32 @@ export default function PDFViewer({
     }
   }, [loadedPdfDocument, setTotalPages]);
 
+  const [fileurl, setfileUrl] = useState<string | null>(null);
+
   // When citeHighlights changes, merge them into main highlights
   useEffect(() => {
-    if (citeHighlights.length > 0) {
-      setHighlights((prev) => {
-        const updated = prev.concat(citeHighlights);
-        return updated;
-      });
+    if (citeHighlights && citeHighlights.length > 0) {
+      dispatch(concatHighlights(citeHighlights));
     }
   }, [citeHighlights]);
 
+  useEffect(() => {
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setfileUrl(url);
+      return () => {
+        URL.revokeObjectURL(url);
+      };
+    }
+  }, [file]);
+
+  
   /**
    * Popup content component shown when hovering on a highlight.
    *
    * @param {{comment?: {text?: string}, content?: {text?: string}}} props
    */
-  const HighlightPopup = ({
+  const HighlightPopupCite = ({
     comment,
     content,
   }: {
@@ -173,7 +192,7 @@ export default function PDFViewer({
       if (hashtype === "#highlight") {
         return pagehighlights.find((highlight) => highlight.id === id);
       } else {
-        return citeHighlights.find((highlight) => highlight.id === id);
+        return citeHighlights?.find((highlight) => highlight.id === id);
       }
     },
     [pagehighlights, citeHighlights]
@@ -198,7 +217,6 @@ export default function PDFViewer({
     }
   }, [getHighlightById, citeHighlights]);
 
-
   // Attach event listener to react to changes in URL hash to scroll to highlight
   useEffect(() => {
     const handleHashChange = () => {
@@ -216,16 +234,16 @@ export default function PDFViewer({
    * Adds a new highlight with generated ID and semi-transparent color
    * @param {NewHighlightVarient} highlight - new highlight data
    */
-  const addHighlight = (highlight: NewHighlightVarient) => {
-    setHighlights((prevHighlights) => [
-      {
-        ...highlight,
-        id: getNextId(),
-        color: hexToRgba(activeHighlightColor, 0.5),
-      },
-      ...prevHighlights,
-    ]);
-  };
+  // const addHighlight = (highlight: NewHighlightVarient) => {
+  //   setHighlights((prevHighlights) => [
+  //     {
+  //       ...highlight,
+  //       id: getNextId(),
+  //       color: hexToRgba(activeHighlightColor, 0.5),
+  //     },
+  //     ...prevHighlights,
+  //   ]);
+  // };
 
   /**
    * Handler called when the PDF document finishes loading
@@ -276,7 +294,16 @@ export default function PDFViewer({
           position: "relative",
         }}
       >
-        <PdfLoader url={url} beforeLoad={<Spinner />}>
+        {pdfError && (
+          <div className="text-red-500 text-center p-4">{pdfError}</div>
+        )}
+        <PdfLoader
+          url={url ? url : fileurl!}
+          beforeLoad={<Spinner />}
+          onError={(err) => {
+            setPdfError(err.message);
+          }}
+        >
           {(pdfDocument) => {
             if (!pdfDocument) return null;
 
@@ -310,7 +337,12 @@ export default function PDFViewer({
                       <Tip
                         onOpen={transformSelection}
                         onConfirm={(comment) => {
-                          addHighlight({ content, position, comment });
+                          dispatch(
+                            addHighlight({
+                              highlight: { content, position, comment },
+                              color: activeHighlightColor,
+                            })
+                          );
                           hideTipAndSelection();
                         }}
                       />
@@ -336,27 +368,36 @@ export default function PDFViewer({
                         isScrolledTo={isScrolledTo}
                         highlightColor={highlight.color}
                         highlight={highlight}
-                        handleDeleteHighlight={handleDeleteHighlight}
-                        updateHighlightColor={updateHighlightColor}
-                        onAskAI={handleAskAI}
                       />
                     ) : (
                       <AreaHighlight
                         isScrolledTo={isScrolledTo}
                         highlight={highlight}
                         onChange={(boundingRect) => {
-                          updateHighlight(
-                            highlight.id,
-                            { boundingRect: viewportToScaled(boundingRect) },
-                            { image: screenshot(boundingRect) }
-                          );
+                          updateHighlight({
+                          id: highlight.id,
+                          position: { boundingRect: viewportToScaled(boundingRect) },
+                          content: { image: screenshot(boundingRect) },
+                        });
+
                         }}
                       />
                     );
 
                     return (
                       <Popup
-                        popupContent={<HighlightPopup {...highlight} />}
+                        popupContent={
+                          
+                            !highlight.url ?  
+                            <HighlightPopup
+                            highlight={highlight}
+                            dispatch={dispatch}
+                            onAskAI={handleAskAI}
+                          /> :
+                            <HighlightPopupCite {...highlight}/>
+                          
+                          
+                        }
                         onMouseOver={(popupContent) =>
                           setTip(highlight, (h) => popupContent)
                         }
@@ -367,7 +408,7 @@ export default function PDFViewer({
                       </Popup>
                     );
                   }}
-                  highlights={pagehighlights as any} // Cast due to type restrictions
+                  highlights={highlights as any} // Cast due to type restrictions
                 />
               </div>
             );

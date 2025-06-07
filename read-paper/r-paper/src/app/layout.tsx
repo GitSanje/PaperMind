@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { GlobalContextProvider } from "@/components/context/globalcontext";
 import 'katex/dist/katex.min.css';
+import { ReduxProviders } from "@/components/context/reduxProvider";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -28,9 +29,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <ReduxProviders>
+
+
         <GlobalContextProvider>
                   {children}
         </GlobalContextProvider>
+                </ReduxProviders>
 
       </body>
     </html>
