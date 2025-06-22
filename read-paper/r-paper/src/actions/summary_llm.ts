@@ -14,7 +14,7 @@ import {  createChunksPreservingId, get_chunks_with_ids, get_combined_prompt, ge
  const url = "https://arxiv.org/pdf/1806.07572";
 
 
-const llm = new ChatGoogleGenerativeAI({
+ const llm = new ChatGoogleGenerativeAI({
   model: "gemini-2.0-flash",
   temperature: 0,
   apiKey: process.env.GOOGLE_API_KEY,
@@ -47,7 +47,7 @@ export async function get_chunks(
  * @param {string} [url] - Remote URL of the PDF file.
  * @returns {Promise<{pages_dict: PageDict, pages_list: string[]}>} - Extracted text organized by page.
  */
-async function getTextFromPDF(filePath?: string, url?: string) {
+export async function getTextFromPDF(filePath?: string, url?: string) {
   let docs;
 
    if(url){
@@ -83,7 +83,7 @@ async function getTextFromPDF(filePath?: string, url?: string) {
  * @param {string} text - Input text for the model.
  * @returns {Promise<string>} - Generated content from the model.
  */
-async function getGemini(promptTemplateStr: string, text: string) {
+export async function getGemini(promptTemplateStr: string, text: string) {
   const prompt = PromptTemplate.fromTemplate(promptTemplateStr);
   const chain = prompt.pipe(llm);
   const response = chain.invoke({ text });
@@ -158,4 +158,26 @@ export async function getSummary(formdata: FormData) {
   const allsummary = await getAllsummary(summaries_chunk);
 
   return { chunkswitlables, allsummary };
+}
+
+const prompt = `
+Given the first page of a scientific or academic PDF document, extract a clean and concise title.
+If a clear title is not present, infer one based on the content.
+Return only the title string and nothing else.
+ {text}
+`;
+
+export async function getPdfTitle(formdata: FormData){
+   const filename = formdata.get("filename") as string;
+  const url = formdata.get("url") as string;
+
+  // Extract text pages from PDF file or URL
+  const result = await getTextFromPDF(filename, url);
+  
+ const res = await getGemini(prompt, result.pages_list[0]) as string;
+ return {
+    title: res.trim() || "Untitled Document",
+  };
+
+
 }
