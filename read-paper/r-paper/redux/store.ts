@@ -1,24 +1,35 @@
+"use client"
 import { combineReducers, configureStore } from "@reduxjs/toolkit"
 import storage from "redux-persist/lib/storage"  // defaults to localStorage
 import highlightReducer from './highlightSlice'
 import pdfreducer from './pdfSlice'
+import notionReducer from './notionSlice'
 import { persistStore, persistReducer } from "redux-persist"
 
 const highlightPersistConfig = {
     key:'highlights',
     storage,
-    whitelist:['highlights']
+    whitelist:['highlights','pdfid','userId']
 }
 
 const pdfPersistConfig = {
     key:'pdfsettings',
     storage,
-    whitelist:['summary','citeHighlights','url','file','aiQuery']
+    whitelist:['summary','citeHighlights','url','file','aiQuery','tab','id']
+}
+
+const notionConfig = {
+    key:'notion',
+    storage,
+    whitelist:['notionData','isConnected','databaseId','databaseUrl','selectedParentPage',
+      'availablePages','highlightStatus'
+    ]
 }
 
   const rootReducer = combineReducers({
     highlight: persistReducer(highlightPersistConfig, highlightReducer),
-    pdfsetting: persistReducer(pdfPersistConfig, pdfreducer)
+    pdfsetting: persistReducer(pdfPersistConfig, pdfreducer),
+    notion: persistReducer(notionConfig, notionReducer)
 
   })
 
