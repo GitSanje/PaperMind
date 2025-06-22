@@ -1,10 +1,13 @@
 "use client"
-import { useRef, useState } from "react";
+import {  useRef, useState } from "react";
 import { HighlightType } from "../context/globalcontext";
 import { MessageCircle, Palette, Trash2, X } from "lucide-react";
 import { hexToRgba } from "@/lib/utils";
 import { deleteHighlight, updateHighlightColor } from "../../../redux/highlightSlice";
-import { setAiQuery, setTab } from "../../../redux/pdfSlice";
+import { updatePdfState } from "../../../redux/pdfSlice";
+import { useAppSelector } from "../../../redux/hooks";
+import { updateHColor } from "@/actions/pdf";
+
 
 const colorOptions = ["#FFEB3B", "#4CAF50", "#2196F3", "#F44336", "#9C27B0"];
 
@@ -20,18 +23,19 @@ const HighlightPopup = ({
 
     
     const [showPopup, setShowPopup] = useState(false);
-
+    const {pdfid,userId} = useAppSelector(state => state.highlight)
     const popupRef = useRef<HTMLDivElement>(null);
   const handleAskAI = () => {
     if (highlight.content?.text ) {
-      dispatch(setAiQuery(highlight.content.text));
-      dispatch(setTab('ai'))
+      dispatch(updatePdfState({ aiQuery: highlight.content.text}));
+      dispatch(updatePdfState({tab:'ai'}))
       setShowPopup(false);
     }
   };
 
-  const handleColorChange = (color: string) => {
+  const handleColorChange = async(color: string) => {
        dispatch(updateHighlightColor({id: highlight.id, color: hexToRgba(color, 0.6)}))
+       await updateHColor({userId,pdfId:pdfid, highlightId:highlight.id,newColor: hexToRgba(color, 0.6)})
       setShowPopup(false);
     };
 

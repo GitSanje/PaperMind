@@ -98,6 +98,7 @@ export function escapeBackslashesStrict(input: string): string {
  */
 export function processKatexInMarkdown(markdown: string) {
   if (!markdown) return;
+    if (typeof markdown !== "string") return markdown;
   return markdown
     .replace(/\\\\\[/g, "$$$$")
     .replace(/\\\\\]/g, "$$$$")

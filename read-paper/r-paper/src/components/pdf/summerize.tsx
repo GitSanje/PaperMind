@@ -26,9 +26,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGlobalContext } from "../context/globalcontext";
 import { getHighlightsForCiteIds } from "@/actions/highlight-util";
 import { LabeledChunks } from "@/actions/utils";
-import { addCiteHighlight, setSummary } from "../../../redux/pdfSlice";
-import { useAppDispatch, useAppSelector } from "../../../redux/hooks";
 
+import { useAppDispatch, useAppSelector } from "../../../redux/hooks";
+import {
+
+  concatHighlights,
+
+} from "../../../redux/highlightSlice";
+import { updatePdfState } from "../../../redux/pdfSlice";
 interface SummarizeProps {
   filename?: string;
   url?: string;
@@ -85,14 +90,15 @@ const dispatch= useAppDispatch()
       if (url) formData.append("url", url);
 
       const result = await getSummary(formData);
-      dispatch(setSummary(result.allsummary));
+      dispatch(updatePdfState({ summary: result.allsummary}));
       // setLabelschunks(result.chunkswitlables);
              const highlightciteResults = await getHighlightsForCiteIds(
           loadedPdfDocument!,
           result.chunkswitlables!,
           result.allsummary
         );
-        dispatch(addCiteHighlight(highlightciteResults));
+        dispatch(updatePdfState({citeHighlights:highlightciteResults}));
+          dispatch(concatHighlights(highlightciteResults));
     } catch (err) {
       console.error("Error fetching summary:", err);
       setError("Failed to generate summary. Please try again.");

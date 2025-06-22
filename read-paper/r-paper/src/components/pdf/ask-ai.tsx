@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
 import { BrainCircuit, Send, Trash2, Copy, CheckCheck, FileText } from "lucide-react"
-import { genText } from "@/actions/llm"
+import { clearAll, genText, getMessageHistory } from "@/actions/llm"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
@@ -17,7 +17,9 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import MathRenderer from "./markdown"
 import { useAppDispatch, useAppSelector } from "../../../redux/hooks"
-import { setAiQuery } from "../../../redux/pdfSlice"
+
+import { toast } from "sonner"
+import { updatePdfState } from "../../../redux/pdfSlice"
 
 interface AskAIProps {
  
@@ -46,6 +48,29 @@ export function AskAI({file, url }: AskAIProps) {
   //   }
   // }, [query])
 
+  useEffect(() => {
+    const fetchMessages = async () => {
+      try {
+        const messages = await getMessageHistory('123abc');
+        // console.log(messages);
+        
+        // If messages are stored with different roles (e.g., "assistant"), normalize them
+        const formattedMessages = messages.map((msg: any) => ({
+          role: msg.role === "assistant" ? "ai" : msg.role, // normalize to your state type
+          content: msg.content,
+        }));
+
+        setConversation(formattedMessages);
+      } catch (error) {
+        console.error("Error loading message history:", error);
+      }
+    };
+
+   
+      fetchMessages();
+    
+  }, []);
+
   const handleSubmit = async () => {
     if (!query.trim()) return
 
@@ -55,7 +80,7 @@ export function AskAI({file, url }: AskAIProps) {
     // Add user message to conversation
     const newConversation = [...conversation, { role: "user" as const, content: query }]
     setConversation(newConversation)
-
+         dispatch(updatePdfState({aiQuery:''}))
     try {
       // Prepare form data
       const formData = new FormData()
@@ -66,25 +91,26 @@ export function AskAI({file, url }: AskAIProps) {
       // Simulate streaming for demo purposes
       // In a real implementation, you would use a streaming API
       const fullResponse = await genText(formData)
-
+  
+       setConversation([...newConversation, { role: "ai" as const, content: fullResponse as string }])
       // Simulate streaming by revealing characters gradually
-      let displayedResponse = ""
-      const streamResponse = async () => {
-        for (let i = 0; i < fullResponse.length; i++) {
-          displayedResponse += fullResponse[i]
-          setStreamingResponse(displayedResponse)
-          await new Promise((resolve) => setTimeout(resolve, 10)) 
-        }
+      // let displayedResponse = ""
+      // const streamResponse = async () => {
+      //   for (let i = 0; i < fullResponse.length; i++) {
+      //     displayedResponse += fullResponse[i]
+      //     setStreamingResponse(displayedResponse)
+      //     await new Promise((resolve) => setTimeout(resolve, 10)) 
+      //   }
 
-        // When streaming is complete, add to conversation
-        setConversation([...newConversation, { role: "ai", content: fullResponse }])
-        setStreamingResponse("")
-      }
+      //   // When streaming is complete, add to conversation
+      //   setConversation([...newConversation, { role: "ai", content: fullResponse }])
+      //   setStreamingResponse("")
+      // }
 
-      await streamResponse()
+      // await streamResponse()
 
       // Clear the input
-      dispatch(setAiQuery(""))
+    
     } catch (error) {
       console.error("Error getting AI response:", error)
       setConversation([
@@ -100,10 +126,12 @@ export function AskAI({file, url }: AskAIProps) {
     }
   }
 
-  const clearConversation = () => {
+  const clearConversation = async() => {
+    
+    const result=  await clearAll("123abc")
     setConversation([])
-         dispatch(setAiQuery(""))
-    setStreamingResponse("")
+    dispatch(updatePdfState({aiQuery:''}))
+    toast.success(result.message)
   }
 
   const copyToClipboard = (text: string, messageId: number) => {
@@ -176,7 +204,7 @@ export function AskAI({file, url }: AskAIProps) {
         <Textarea
           placeholder="Ask a question about your PDF..."
           value={query}
-          onChange={(e) => dispatch(setAiQuery(e.target.value))}
+          onChange={(e) => dispatch(updatePdfState({aiQuery:e.target.value}))}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault()

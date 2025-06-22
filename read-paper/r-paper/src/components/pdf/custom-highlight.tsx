@@ -67,6 +67,7 @@ export function CustomHighlight({
           }}
         >
           {comment.emoji}
+          {comment.text}
         </div>
       ) : null}
 

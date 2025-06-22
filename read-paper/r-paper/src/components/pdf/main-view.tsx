@@ -16,13 +16,12 @@ import {
   Plus,
   ChevronLeft,
   ChevronRight,
-  ZoomIn,
-  ZoomOut,
   CircleSlash,
   BookOpen,
   BrainCircuit,
   Sparkles,
   LinkIcon,
+  Database,
 } from "lucide-react";
 
 import PDFViewer from "@/components/pdf/pdf-viewer";
@@ -39,9 +38,16 @@ import { Summarize } from "./summerize";
 import { Input } from "../ui/input";
 import { deleteHighlight } from "../../../redux/highlightSlice";
 import { useAppDispatch, useAppSelector } from "../../../redux/hooks";
-import { setFile, setIsSelecting, setTab, setUrl } from "../../../redux/pdfSlice";
 
+import Link from "next/link";
+import CreatePage from "../notion/create-page";
+import { NotionConnectButton } from "../notion/notion-connect-button";
+import { Session } from "next-auth";
+import { NotionSyncPanel } from "../notion/notion-sync-panel";
 
+import { HighlightType } from "../context/globalcontext";
+import { getPdfTitle } from "@/actions/summary_llm";
+import { updatePdfState } from "../../../redux/pdfSlice";
 const highlightOptions = [
   "#FFEB3B",
   "#4CAF50",
@@ -51,8 +57,7 @@ const highlightOptions = [
   { type: "none" }, // icon button to disable selection
 ];
 
-export default function PDFViewerPage() {
-
+export default function PDFViewerPage({ session }: { session: Session }) {
   const [notes, setNotes] = useState<
     Array<{
       id: string;
@@ -73,30 +78,47 @@ export default function PDFViewerPage() {
   const [isurl, IsSetUrl] = useState<boolean>(false);
   const [selectionPosition, setSelectionPosition] = useState({ x: 0, y: 0 });
   const [dictionaryWord, setDictionaryWord] = useState("");
+  
 
   const {
-  
     pagehighlights,
     setHighlights,
     selectedText,
     setSelectedText,
     setShowSelectionPopup,
     showSelectionPopup,
-    handleAskAI,
   } = useGlobalContext();
 
-   const tab = useAppSelector((state) => state.pdfsetting.tab)
-   const isSelecting = useAppSelector((state) => state.pdfsetting.isSelecting)
-   const file = useAppSelector((state) => state.pdfsetting.file)
-   const url = useAppSelector((state) => state.pdfsetting.url)
-   const dispatch = useAppDispatch()
+  
+  const tab = useAppSelector((state) => state.pdfsetting.tab);
+  const isSelecting = useAppSelector((state) => state.pdfsetting.isSelecting);
+  const file = useAppSelector((state) => state.pdfsetting.file);
+  const url = useAppSelector((state) => state.pdfsetting.url);
+   const pdfTitle = useAppSelector((state) => state.pdfsetting.pdfTitle);
+  const highlights = useAppSelector((state) => state.highlight.highlights);
+  const highlightStatus = useAppSelector((state) => state.notion.highlightStatus);
+  const isConnected = useAppSelector((state) => state.notion.isConnected);
+
+  const completedIds = new Set(
+  highlightStatus
+    .filter((h) => h.status === "completed")
+    .map((h) => h.id)
+);
+
+const highlightText = highlights
+  .filter((h) => h.content.text && !h.url && !completedIds.has(h.id));
+  const dispatch = useAppDispatch();
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-     dispatch( setFile(e.target.files[0]));
+      dispatch(updatePdfState({file: 
+        e.target.files[0]}));
       setCurrentPage(1);
       setNotes([]);
     }
   };
+
+
+
 
   const handleAddNote = () => {
     if (!file) return;
@@ -188,10 +210,21 @@ export default function PDFViewerPage() {
   // Handle dictionary lookup
   const handleDictionaryLookup = (word: string) => {
     setDictionaryWord(word || selectedText);
+    dispatch(updatePdfState({tab:"tool"}));
     setShowSelectionPopup(false);
   };
 
- 
+  /**
+   * Sets an AI query (either custom or from the selected text),
+   * switches to the AI tab, and closes the popup.
+   *
+   * @param {string} query - User's question or text for AI
+   */
+  const handleAskAI = (query: string) => {
+    dispatch(updatePdfState({aiQuery:query}));
+        dispatch(updatePdfState({tab:"ai"}));
+    setShowSelectionPopup(false);
+  };
 
   useEffect(() => {
     if (totalPages > 0 && pdfContainerRef.current) {
@@ -232,13 +265,13 @@ export default function PDFViewerPage() {
       };
     }
   }, [totalPages, setCurrentPage, pdfContainerRef]);
-const handleTabChange = (newTab: string) => {
-    dispatch(setTab(newTab));
+
+  const handleTabChange = (newTab: string) => {
+      dispatch(updatePdfState({tab:newTab}));
   };
+  const notionAuthUrl = process.env.NEXT_PUBLIC_NOTION_AUTH_URL;
   return (
     <div className="container mx-auto py-6 max-w-7xl">
-      <h1 className="text-3xl font-bold mb-6">PDF Reader</h1>
-   
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between mb-4">
@@ -299,6 +332,7 @@ const handleTabChange = (newTab: string) => {
                     scale={scale}
                     activeHighlightColor={activeHighlightColor}
                     onTextSelection={handleTextSelection}
+                    session = {session}
                   />
                 </div>
                 {showSelectionPopup && (
@@ -321,27 +355,27 @@ const handleTabChange = (newTab: string) => {
                   Upload a PDF to get started with highlighting and note-taking
                 </p>
                 <Button onClick={triggerFileInput}>Select PDF File</Button>
-                    
-                    <p className="text-muted-foreground mb-4"> or  </p>
-                    
-                 <div className="space-y-2 mb-4">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Enter PDF URL (e.g., https://example.com/document.pdf)"
-                    value={url!}
-                     onChange={(e) => dispatch(setUrl(e.target.value))}
-                    onKeyDown={(e) => e.key === "Enter"}
-                    className="flex-1"
-                  />
-                  <Button className="gap-2" onClick={() => IsSetUrl(true)}>
-                    <LinkIcon className="h-4 w-4" />
-                    Load PDF
-                    {/* {isLoadingUrl ? "Loading..." : "Load PDF"} */}
-                  </Button>
-                </div>
-                {/* {urlError && <p className="text-sm text-red-600">{urlError}</p>}
+
+                <p className="text-muted-foreground mb-4"> or </p>
+
+                <div className="space-y-2 mb-4">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Enter PDF URL (e.g., https://example.com/document.pdf)"
+                      value={url!}
+                      onChange={(e) => dispatch(updatePdfState({ url:e.target.value}))}
+                      onKeyDown={(e) => e.key === "Enter"}
+                      className="flex-1"
+                    />
+                    <Button className="gap-2" onClick={() => IsSetUrl(true)}>
+                      <LinkIcon className="h-4 w-4" />
+                      Load PDF
+                      {/* {isLoadingUrl ? "Loading..." : "Load PDF"} */}
+                    </Button>
+                  </div>
+                  {/* {urlError && <p className="text-sm text-red-600">{urlError}</p>}
                 {pdfUrl && <p className="text-sm text-muted-foreground truncate">Loaded: {pdfUrl}</p>} */}
-              </div>
+                </div>
               </div>
             </div>
           )}
@@ -439,7 +473,7 @@ const handleTabChange = (newTab: string) => {
                           style={{ backgroundColor: option }}
                           onClick={() => {
                             setActiveHighlightColor(option);
-                            dispatch(setIsSelecting(true));
+                            dispatch(updatePdfState({isSelecting:true}));
                           }}
                         />
                       );
@@ -454,7 +488,7 @@ const handleTabChange = (newTab: string) => {
                           }`}
                           title="Disable highlight mode"
                           onClick={() => {
-                            dispatch(setIsSelecting(false));
+                            dispatch(updatePdfState({isSelecting:false}));
                           }}
                         >
                           <CircleSlash className="w-4 h-4" />
@@ -534,24 +568,54 @@ const handleTabChange = (newTab: string) => {
                   </Tabs>
                 </CardContent>
               </Card>
+              <NotionConnectButton userId={session?.user.id} />
+
+              <Card>
+                <CardContent className="p-4">
+                  <h3 className="font-medium mb-3">Export Options</h3>
+                  <div className="space-y-2">
+                    <Button variant="outline" className="w-full justify-start">
+                      Export highlights as JSON
+                    </Button>
+                    <Button variant="outline" className="w-full justify-start">
+                      Export notes as Markdown
+                    </Button>
+                    <Button variant="outline" className="w-full justify-start">
+                      Generate PDF report
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="highlights">
               <Sidebar
                 resetHighlights={resetHighlights}
-                ispdfAvailable={!!file|| isurl}
-               
+                ispdfAvailable={!!file || isurl}
               />
+              {/* Notion Sync Panel */}
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Database className="h-5 w-5 text-blue-600" />
+                    <h3 className="font-medium">Notion Sync</h3>
+                  </div>
+                  <NotionSyncPanel
+                    userId={session?.user.id}
+                    highlights={highlightText as HighlightType[]}
+                    pdfTitle={pdfTitle!}
+                    pdfUrl={url!}
+                    isConnected={isConnected}
+                  />
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="summerize">
               <Card>
                 <CardContent className="p-4 max-h-[600px] overflow-y-auto">
-                  {file || url? (
-                    <Summarize
-                      filename={file?.name as string}
-                      url={url!}
-                    />
+                  {file || url ? (
+                    <Summarize filename={file?.name as string} url={url!} />
                   ) : (
                     "Upload file to summerize"
                   )}
@@ -562,10 +626,7 @@ const handleTabChange = (newTab: string) => {
             <TabsContent value="ai">
               <Card>
                 <CardContent className="p-4 max-h-[600px] overflow-y-auto">
-                  <AskAI
-                    file={file!}
-                    url={url!}
-                  />
+                  <AskAI file={file!} url={url!} />
                 </CardContent>
               </Card>
             </TabsContent>

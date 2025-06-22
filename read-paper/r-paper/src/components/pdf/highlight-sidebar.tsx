@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Trash2, BookOpen, ImageIcon } from 'lucide-react'
 import { Badge } from "@/components/ui/badge"
 import { deleteHighlight } from "../../../redux/highlightSlice"
-import { useAppSelector } from "../../../redux/hooks"
+import { useAppDispatch, useAppSelector } from "../../../redux/hooks"
+import { Spinner } from "../ui/spinner"
+import { deleteHighlightDB } from "@/actions/pdf"
 
 interface SidebarProps {
   ispdfAvailable:boolean
@@ -21,7 +23,14 @@ const updateHash = (highlight: HighlightType) => {
 
 
 export function Sidebar({ ispdfAvailable, resetHighlights, toggleDocument }: SidebarProps) {
-  const highlights = useAppSelector((state) => state.highlight.highlights)
+  const {highlights,loading,userId,pdfid} = useAppSelector((state) => state.highlight)
+
+  const dispatch = useAppDispatch()
+  const handleDeleteHighlight = async (id:string) => {
+      dispatch(deleteHighlight({id}))
+      await deleteHighlightDB({userId,pdfId:pdfid,highlightId: id})
+     
+  }
   return (
     <div className="w-full bg-white rounded-lg border shadow-sm">
       <div className="p-4 border-b">
@@ -90,12 +99,12 @@ export function Sidebar({ ispdfAvailable, resetHighlights, toggleDocument }: Sid
                       </Badge>
                     )}
                     <div className="">
-                   {deleteHighlight && (
+                   { (
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                        onClick={() => deleteHighlight({id: highlight.id})}
+                        onClick={() => handleDeleteHighlight(highlight.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -110,10 +119,10 @@ export function Sidebar({ ispdfAvailable, resetHighlights, toggleDocument }: Sid
           </ul>
         </ScrollArea>
       ) : (
-        <div className="p-6 text-center text-muted-foreground">
+       !loading ? <div className="p-6 text-center text-muted-foreground">
           <p>No highlights yet</p>
           <p className="text-sm mt-1">Select text in the PDF to highlight it</p>
-        </div>
+        </div>: <Spinner/>
       )}
       
       <div className="p-3 border-t flex justify-between">

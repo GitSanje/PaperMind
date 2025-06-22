@@ -7,7 +7,6 @@ import {
   AreaHighlight,
   PdfHighlighter,
   PdfLoader,
-  Highlight,
   Popup,
   Tip,
 } from "react-pdf-highlighter";
@@ -33,7 +32,7 @@ interface PDFViewerProps {
   setTotalPages: (pages: number) => void;
   scale: number;
   activeHighlightColor: string;
-
+  session: Session;
   onTextSelection?: (text: string, position: { x: number; y: number }) => void;
 }
 
@@ -69,10 +68,25 @@ import { hexToRgba } from "@/lib/utils";
 import {
   addHighlight,
   concatHighlights,
+  fetchHighlights,
   updateHighlight,
+  updateHState,
 } from "../../../redux/highlightSlice";
 import { useAppDispatch, useAppSelector } from "../../../redux/hooks";
 import HighlightPopup from "./HighlightPopup";
+import { updateNotionState } from "../../../redux/notionSlice";
+import { Status } from "@/actions/notion";
+
+import { Session } from "next-auth";
+import {
+  createHighlight,
+  getPDFData,
+  hashPDF,
+  storeHighlightToRedis,
+  storePDF,
+} from "@/actions/pdf";
+import { updatePdfState } from "../../../redux/pdfSlice";
+import { getPdfTitle } from "@/actions/summary_llm";
 
 // Configure pdfjs worker to load from CDN
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -101,18 +115,23 @@ export default function PDFViewer({
   scale,
   activeHighlightColor,
   onTextSelection,
+  session,
 }: PDFViewerProps) {
-
-
   // Extract global context state and methods related to highlights and PDF document
   const { handleAskAI, loadedPdfDocument, setPdfDocument } = useGlobalContext();
 
-  const highlights = useAppSelector((state) => state.highlight.highlights);
+
   const citeHighlights = useAppSelector(
     (state) => state.pdfsetting.citeHighlights
   );
   const isSelecting = useAppSelector((state) => state.pdfsetting.isSelecting);
+  const pdfTitle = useAppSelector((state) => state.pdfsetting.pdfTitle);
+
   const pagehighlights = useAppSelector((state) => state.highlight.highlights);
+   const [fileurl, setfileUrl] = useState<string | null>(null);
+
+  // When citeHighlights changes, merge them into main highlights
+const { highlights, pdfid, userId } = useAppSelector(state => state.highlight);
 
   const [pdfError, setPdfError] = useState<string | null>(null);
 
@@ -126,14 +145,13 @@ export default function PDFViewer({
     }
   }, [loadedPdfDocument, setTotalPages]);
 
-  const [fileurl, setfileUrl] = useState<string | null>(null);
-
-  // When citeHighlights changes, merge them into main highlights
+ 
   useEffect(() => {
-    if (citeHighlights && citeHighlights.length > 0) {
-      dispatch(concatHighlights(citeHighlights));
+    if (highlights.length === 0 && pdfid && userId) {
+      dispatch(fetchHighlights({ userId, pdfId: pdfid }));
     }
-  }, [citeHighlights]);
+  }, [dispatch, highlights.length, pdfid, userId]);
+
 
   useEffect(() => {
     if (file) {
@@ -145,7 +163,79 @@ export default function PDFViewer({
     }
   }, [file]);
 
-  
+  useEffect(() => {
+    if (!pdfTitle) {
+      const getTitle = async () => {
+        const formData = new FormData();
+        if (file) formData.append("filename", file.name);
+        if (url) formData.append("url", url);
+        if (file || (url && !pdfTitle)) {
+          const data = await getPdfTitle(formData);
+          dispatch(updatePdfState({ pdfTitle: data.title }));
+        }
+      };
+      getTitle();
+    }
+  }, []);
+
+  useEffect(() => {
+    const storePdf = async () => {
+      try {
+        if (!pdfTitle || (!file && !url) || pdfid || !session?.user?.id) {
+          return;
+        }
+
+        const formData = new FormData();
+        if (file) formData.append("file", file);
+        if (url) formData.append("url", url);
+
+        // Hash file/url to generate unique ID
+        const hashId = await hashPDF(formData);
+
+        // Check if it already exists in Redis
+        const pdfInfo = await getPDFData(hashId, session.user.id);
+
+        if (!pdfInfo.exists) {
+          // Store in database and cache
+          const result = await storePDF({
+            pdfid: hashId,
+            title: pdfTitle,
+            userId: session.user.id,
+            fileName: file?.name ?? url ?? "",
+            url: url ?? "",
+          });
+
+          if (result.status && result.pdf) {
+            dispatch(updatePdfState({ id: result.pdf.id }));
+            dispatch(updateHState({pdfid:result.pdf.id, userId:session.user.id}))
+          } else {
+            console.error("Failed to store PDF:", result.error);
+            return;
+          }
+        }
+
+        // Use data from Redis if available
+        const { data } = pdfInfo;
+        if (data) {
+          const parsed = typeof data === "string" ? JSON.parse(data) : data;
+          dispatch(
+            updatePdfState({
+              id: parsed.id,
+              pdfTitle: parsed.title,
+              summary: parsed.summary,
+            })
+          );
+
+          dispatch(updateHState({pdfid:parsed.id, userId:session.user.id}))
+        }
+      } catch (error) {
+        console.error("❌ Error in PDF handling:", error);
+      }
+    };
+
+    storePdf();
+  }, [pdfTitle, file, url, pdfid, session?.user?.id]);
+
   /**
    * Popup content component shown when hovering on a highlight.
    *
@@ -231,21 +321,6 @@ export default function PDFViewer({
   }, [scrollToHighlightFromHash]);
 
   /**
-   * Adds a new highlight with generated ID and semi-transparent color
-   * @param {NewHighlightVarient} highlight - new highlight data
-   */
-  // const addHighlight = (highlight: NewHighlightVarient) => {
-  //   setHighlights((prevHighlights) => [
-  //     {
-  //       ...highlight,
-  //       id: getNextId(),
-  //       color: hexToRgba(activeHighlightColor, 0.5),
-  //     },
-  //     ...prevHighlights,
-  //   ]);
-  // };
-
-  /**
    * Handler called when the PDF document finishes loading
    * Sets the PDF document proxy and total pages in context
    *
@@ -280,6 +355,27 @@ export default function PDFViewer({
       }
     }
   };
+
+  async function handleAddHighlightWithStatus({
+    highlight,
+    color,
+  }: {
+    highlight: NewHighlightVarient;
+    color?: string;
+  }) {
+    const id = getNextId();
+ 
+
+    dispatch(addHighlight({ highlight: highlight, color, id }));
+    dispatch(updateNotionState({ highlightStatus:[{ id, status: "idle" as Status }]}));
+ 
+    const hdata:HighlightType= { ...highlight, id,color };
+    await createHighlight({
+      pdfId: pdfid!,
+      highlightData: hdata,
+      userId:session.user.id
+    });
+  }
 
   return (
     <div
@@ -337,12 +433,11 @@ export default function PDFViewer({
                       <Tip
                         onOpen={transformSelection}
                         onConfirm={(comment) => {
-                          dispatch(
-                            addHighlight({
-                              highlight: { content, position, comment },
-                              color: activeHighlightColor,
-                            })
-                          );
+                          handleAddHighlightWithStatus({
+                            highlight: { content, position, comment },
+                            color: activeHighlightColor,
+                          });
+
                           hideTipAndSelection();
                         }}
                       />
@@ -375,11 +470,12 @@ export default function PDFViewer({
                         highlight={highlight}
                         onChange={(boundingRect) => {
                           updateHighlight({
-                          id: highlight.id,
-                          position: { boundingRect: viewportToScaled(boundingRect) },
-                          content: { image: screenshot(boundingRect) },
-                        });
-
+                            id: highlight.id,
+                            position: {
+                              boundingRect: viewportToScaled(boundingRect),
+                            },
+                            content: { image: screenshot(boundingRect) },
+                          });
                         }}
                       />
                     );
@@ -387,16 +483,15 @@ export default function PDFViewer({
                     return (
                       <Popup
                         popupContent={
-                          
-                            !highlight.url ?  
+                          !highlight.url ? (
                             <HighlightPopup
-                            highlight={highlight}
-                            dispatch={dispatch}
-                            onAskAI={handleAskAI}
-                          /> :
-                            <HighlightPopupCite {...highlight}/>
-                          
-                          
+                              highlight={highlight}
+                              dispatch={dispatch}
+                              onAskAI={handleAskAI}
+                            />
+                          ) : (
+                            <HighlightPopupCite {...highlight} />
+                          )
                         }
                         onMouseOver={(popupContent) =>
                           setTip(highlight, (h) => popupContent)
