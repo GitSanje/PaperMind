@@ -4,6 +4,10 @@ import "./globals.css";
 import { GlobalContextProvider } from "@/components/context/globalcontext";
 import 'katex/dist/katex.min.css';
 import { ReduxProviders } from "@/components/context/reduxProvider";
+import { Toaster, toast } from 'sonner'
+import Navbar from "@/components/layout/navbar";
+import { auth } from "@/auth";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -19,11 +23,15 @@ export const metadata: Metadata = {
   description: "Landing page",
 };
 
-export default function RootLayout({
+export  default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth()
+  console.log('====================================');
+  console.log(session);
+  console.log('====================================');
   return (
     <html lang="en">
       <body
@@ -33,6 +41,8 @@ export default function RootLayout({
 
 
         <GlobalContextProvider>
+          <Toaster/>
+          <Navbar session={session!}/>
                   {children}
         </GlobalContextProvider>
                 </ReduxProviders>

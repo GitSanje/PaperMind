@@ -1,0 +1,198 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String              @id @default(cuid())
+  first_name         String?
+  last_name          String?
+  name               String?
+  password           String?
+  email              String?             @unique
+  emailVerified      DateTime?
+  image              String?
+  PasswordResetToken PasswordResetToken?
+  role               RoleUser            @default(User)
+  accounts           Account[]
+  sessions           Session[]
+
+  PDF               PDF[]
+  NotionHighlight   NotionHighlight[]
+  NotionIntegration NotionIntegration?
+  NotionPageDB      NotionPageDB[]
+}
+
+enum RoleUser {
+  User
+  Admin
+}
+
+// Password reset token for forgot password functionality
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PDF {
+  id              String            @id @default(cuid())
+  title           String
+  url             String?
+  fileName        String?
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  highlights      Highlight[]
+  summary         String? // AI summary
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  NotionHighlight NotionHighlight[]
+  Thread          Thread[]
+}
+
+model Highlight {
+  id    String @id @default(cuid())
+  pdfId String
+  pdf   PDF    @relation(fields: [pdfId], references: [id], onDelete: Cascade)
+
+  highlightData   Json
+  color           String?
+  status          Status           @default(idle)
+  createdAt       DateTime         @default(now())
+  NotionHighlight NotionHighlight?
+}
+
+model NotionPageDB {
+  id              String            @id @default(cuid())
+  databaseId      String
+  databaseUrl     String
+  title           String?
+  parentPageId    String?
+  NotionHighlight NotionHighlight[]
+  integrationId   String
+  integration     NotionIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NotionHighlight {
+  id String @id @default(cuid())
+
+  pdfTitle   String
+  databaseId String
+
+  notionPageId String? // Notion API response page ID
+
+  status Status @default(idle)
+
+  highlightData Json
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pdfId         String
+  pdf           PDF          @relation(fields: [pdfId], references: [id], onDelete: Cascade)
+  hid           String       @unique
+  highlight     Highlight    @relation(fields: [hid], references: [id], onDelete: Cascade)
+  pid           String       @unique
+  notionpagedb  NotionPageDB @relation(fields: [pid], references: [id], onDelete: Cascade)
+}
+
+model NotionIntegration {
+  id String @id @default(cuid())
+
+  accessToken   String // The Notion API access token
+  workspaceId   String
+  workspaceName String?
+
+  botId        String?
+  notionUserId String?
+
+  notionEmail String?
+  notionName  String?
+
+  rawData Json
+  userId  String @unique
+  user    User   @relation(fields: [userId], references: [id])
+
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  NotionPageDB NotionPageDB[]
+}
+
+enum Status {
+  idle
+  syncing
+  completed
+  error
+}
+
+model Thread {
+  id       String @id @default(cuid())
+  threadId String @unique
+
+  title    String?
+  messages Message[] @relation("ThreadMessages")
+  pdfId    String
+  pdf      PDF       @relation(fields: [pdfId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  role      Role // 'human', 'ai', 'system', 'tool'
+  content   String   @db.Text
+  toolCalls Json? // store tool_call metadata (if any)
+  createdAt DateTime @default(now())
+
+  threadId String
+  thread   Thread @relation("ThreadMessages", fields: [threadId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  human
+  ai
+  system
+  tool
+}

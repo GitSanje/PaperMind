@@ -7,8 +7,7 @@ const nextConfig: NextConfig = {
         canvas:'./empty-module.ts',
       }
   },
-  serverExternalPackages:['faiss-node','pdf-parse','fs'],
-  // trailingSlash:true
+  serverExternalPackages:['faiss-node','pdf-parse','fs','ioredis'],
   reactStrictMode:false
 };
 
