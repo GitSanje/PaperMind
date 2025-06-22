@@ -16,8 +16,11 @@ import {
   MessageSquare,
 } from "lucide-react"
 import Link from "next/link"
+import { Session } from "next-auth"
 
-export default function LandingPage() {
+export default function LandingPage({ user} : {
+  user : Session
+}) {
   const features = [
     {
       icon: Highlighter,
@@ -111,25 +114,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       {/* Navigation */}
-      <nav className="bg-white/80 backdrop-blur-md border-b sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <FileText className="h-8 w-8 text-blue-600" />
-            <span className="text-xl font-bold text-gray-900">Paper Mind</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link href="#features" className="text-gray-600 hover:text-gray-900 transition-colors">
-              Features
-            </Link>
-            <Link href="#pricing" className="text-gray-600 hover:text-gray-900 transition-colors">
-              Pricing
-            </Link>
-            <Link href="/pdf-view">
-              <Button>Get Started</Button>
-            </Link>
-          </div>
-        </div>
-      </nav>
+   
 
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-20 text-center">
@@ -151,7 +136,7 @@ export default function LandingPage() {
             researchers, and professionals who work with complex PDFs.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Link href="/pdf-view">
+            <Link href="/signin">
               <Button size="lg" className="gap-2">
                 <Upload className="h-5 w-5" />
                 Start Analyzing
