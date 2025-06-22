@@ -1,3 +1,4 @@
+
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import {
   findNumbers,
@@ -8,6 +9,8 @@ import stringSimilarity from "string-similarity";
 import { HighlightType } from "@/components/context/globalcontext";
 
 import { LTWHP, Scaled } from "react-pdf-highlighter";
+import { client } from "@/db/redis";
+import { NewHighlightVarient } from "@/components/pdf/pdf-viewer";
 
 // Generate a unique ID for highlights
 export const getNextId = () => String(Math.random()).slice(2);
@@ -370,7 +373,7 @@ export async function createHighlightFromIndices(
 }
 /**
  * Generate highlights in a PDF document for citations referenced in the summary text.
- * 
+ *
  * @param {PDFDocumentProxy} pdfDocument - The loaded PDF document object.
  * @param {LabeledChunks} labeledChunks - The labeled chunks containing passage data.
  * @param {string} summaries - Summary text containing citation IDs in square brackets.
@@ -428,3 +431,5 @@ export async function getHighlightsForCiteIds(
 
   return highlightsMap;
 }
+
+
