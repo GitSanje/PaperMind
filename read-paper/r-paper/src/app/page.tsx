@@ -1,8 +1,10 @@
 import LandingPage from "@/components/ui/landing";
+import { auth } from "@/middleware";
 import Image from "next/image";
 
-export default function Home() {
+export  default async function Home() {
+ const session = await auth()
   return (
-  <LandingPage/>
+  <LandingPage user={session!}/>
   );
 }

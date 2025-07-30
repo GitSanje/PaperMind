@@ -37,6 +37,7 @@ import { BufferMemory } from "langchain/memory";
 import { RedisChatMessageHistory } from "@langchain/community/stores/message/ioredis";
 import { RedisSaver } from "@/lib/redis-checkpointer";
 import { load } from "@langchain/core/load";
+import { use } from "react";
 
 // Load and index documents from a URL
 async function loadRag(url?: string, file?: File) {
@@ -134,7 +135,10 @@ export async function genText(formData: FormData) {
   const file = formData.get("file") as File;
   const query = formData.get("query") as string;
   const url = formData.get("url") as string;
+  const userId = formData.get("userId") as string;
+  const pdfId = formData.get("pdfId") as string;
 
+ 
   const vectorStore = await loadRag(url, file);
 
   if (!vectorStore) {
@@ -270,7 +274,7 @@ export async function genText(formData: FormData) {
   });
   // Specify an ID for the thread
   const threadConfig = {
-    configurable: { thread_id: "123abc" },
+    configurable: { thread_id: "123abc" , userId:userId,pdfId:pdfId},
     streamMode: "values" as const,
   };
 
@@ -313,17 +317,15 @@ export async function genText(formData: FormData) {
 
   return finalAnswer;
 }
-export const getMessageHistory = async (thread_id: string) => {
-  const allMessages: Array<{ role: "user" | "ai"; content: string }> = [];
+export const getMessageHistory = async (thread_id: string,pdfId:string, userId:string) => {
+  const allMessages: Array<{ role: "human" | "ai"; content: string }> = [];
   const seen = new Set<string>();
 
-  const zsetKey = `checkpoints:${thread_id}`;
+  const zsetKey = `checkpoints:${userId}:${pdfId}:${thread_id}`;
   const allCheckpointIds = await client.zrevrange(zsetKey, 0, -1);
-  console.log('====================================');
-  console.log(allCheckpointIds);
-  console.log('====================================');
+
   for (const checkpoint_id of allCheckpointIds) {
-    const key = `checkpoint:${thread_id}:${checkpoint_id}`;
+       const key = `checkpoint:${userId}:${pdfId}:${thread_id}:${checkpoint_id}`;
     const data = await client.hgetall(key);
     if (!data?.checkpoint || !data?.metadata) continue;
 
@@ -333,14 +335,14 @@ export const getMessageHistory = async (thread_id: string) => {
     if (channelValues?.messages && Array.isArray(channelValues.messages)) {
       const messages = channelValues.messages.map((message) => {
         if (message instanceof HumanMessage)
-          return { role: "user", content: message.content };
+          return { role: "human", content: message.content };
         if (
           message instanceof AIMessage &&
           typeof message.content === "string"
         )
           return { role: "ai", content: message.content };
         return null;
-      }).filter(Boolean) as Array<{ role: "user" | "ai"; content: string }>;
+      }).filter(Boolean) as Array<{ role: "human" | "ai"; content: string }>;
 
       for (const msg of messages) {
         const key = `${msg.role}-${msg.content}`;
@@ -356,9 +358,9 @@ export const getMessageHistory = async (thread_id: string) => {
 };
 
 
-export const clearAll = async (thread_id: string) => {
+export const clearAll = async (thread_id: string,pdfId:string, userId:string) => {
   try {
-    const zsetKey = `checkpoints:${thread_id}`;
+   const zsetKey = `checkpoints:${userId}:${pdfId}:${thread_id}`;
 
     // Get all checkpoint IDs for the thread
     const allCheckpointIds = await client.zrevrange(zsetKey, 0, -1);

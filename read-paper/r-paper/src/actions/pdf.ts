@@ -4,6 +4,7 @@ import { db } from "@/db/prisma";
 import { client } from "@/db/redis";
 import axios from "axios";
 import { HighlightType } from "@/components/context/globalcontext";
+import { setHstatusToRedis } from "./notion";
 
 type StorePdfInput = {
   pdfid: string;
@@ -122,6 +123,7 @@ export async function createHighlight({
     });
   
    await storeHighlightToRedis(highlightData,userId,id, pdfId)
+    await setHstatusToRedis(userId,pdfId,id, status)
     return { success: true };
   } catch (error) {
     console.error("Failed to create highlight:", error);

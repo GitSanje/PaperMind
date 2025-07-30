@@ -7,13 +7,14 @@ import { SignInFormData, SignupFormData } from "@/types";
 import { signIn, signOut } from "../auth";
 import { signInSchema } from "@/schemas";
 import { AuthError } from "next-auth";
+import { db } from "@/db/prisma";
  
 export const signup = async (data: SignupFormData) => {
   try {
     const { first_name, last_name, email, password } = data;
 
     // Check if the email already exists
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await db.user.findUnique({
       where: { email },
     });
 
@@ -28,7 +29,7 @@ export const signup = async (data: SignupFormData) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create the user
-    await prisma.user.create({
+    await db.user.create({
       data: {
         first_name,
         last_name,
@@ -84,7 +85,7 @@ export const signInCred = async (data: SignInFormData) => {
     const { email, password } = validatedFields.data;
 
     // Step 1: Find user by email
-    const user = await prisma.user.findUnique({
+    const user = await db.user.findUnique({
       where: { email },
     });
 

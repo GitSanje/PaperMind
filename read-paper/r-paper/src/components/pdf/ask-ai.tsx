@@ -20,6 +20,7 @@ import { useAppDispatch, useAppSelector } from "../../../redux/hooks"
 
 import { toast } from "sonner"
 import { updatePdfState } from "../../../redux/pdfSlice"
+import { deleteMessagesByThreadAndPdf, upsertThreadAndMessages } from "@/actions/message"
 
 interface AskAIProps {
  
@@ -30,7 +31,7 @@ interface AskAIProps {
 export function AskAI({file, url }: AskAIProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [streamingResponse, setStreamingResponse] = useState("")
-  const [conversation, setConversation] = useState<Array<{ role: "user" | "ai"; content: string }>>([])
+  const [conversation, setConversation] = useState<Array<{ role: "human" | "ai"; content: string }>>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState<string | null>(null)
 
@@ -40,7 +41,7 @@ export function AskAI({file, url }: AskAIProps) {
   }, [conversation, streamingResponse])
 
   const dispatch = useAppDispatch()
-  const query = useAppSelector((state) => state.pdfsetting.aiQuery)
+  const {aiQuery:query, pdfid,userId} = useAppSelector((state) => state.pdfsetting)
   // // Update query when prop changes
   // useEffect(() => {
   //   if (query && !conversation.some((msg) => msg.content === query)) {
@@ -51,7 +52,7 @@ export function AskAI({file, url }: AskAIProps) {
   useEffect(() => {
     const fetchMessages = async () => {
       try {
-        const messages = await getMessageHistory('123abc');
+        const messages = await getMessageHistory('123abc',pdfid,userId);
         // console.log(messages);
         
         // If messages are stored with different roles (e.g., "assistant"), normalize them
@@ -78,21 +79,29 @@ export function AskAI({file, url }: AskAIProps) {
     setStreamingResponse("")
 
     // Add user message to conversation
-    const newConversation = [...conversation, { role: "user" as const, content: query }]
+    const newConversation = [...conversation, { role: "human" as const, content: query }]
+    let tempquery= query
     setConversation(newConversation)
          dispatch(updatePdfState({aiQuery:''}))
     try {
+      
       // Prepare form data
       const formData = new FormData()
       if (file) formData.append("file", file)
       formData.append("query", query)
       if (url) formData.append("url", url)
-
+       formData.append("pdfId", pdfid);
+       formData.append("userId", userId);
       // Simulate streaming for demo purposes
       // In a real implementation, you would use a streaming API
       const fullResponse = await genText(formData)
-  
-       setConversation([...newConversation, { role: "ai" as const, content: fullResponse as string }])
+      const msg = [
+        { role: "human" as const, content: tempquery },
+        {role: "ai" as const, content: fullResponse as string }
+      ]
+      console.log(fullResponse,'airesponse');
+      
+      setConversation([...newConversation, { role: "ai" as const, content: fullResponse as string }])
       // Simulate streaming by revealing characters gradually
       // let displayedResponse = ""
       // const streamResponse = async () => {
@@ -108,8 +117,10 @@ export function AskAI({file, url }: AskAIProps) {
       // }
 
       // await streamResponse()
-
+      
+      console.log("About to insert into DB:")
       // Clear the input
+      await upsertThreadAndMessages({threadId:'123abc', pdfId:pdfid,messages:msg})
     
     } catch (error) {
       console.error("Error getting AI response:", error)
@@ -128,7 +139,8 @@ export function AskAI({file, url }: AskAIProps) {
 
   const clearConversation = async() => {
     
-    const result=  await clearAll("123abc")
+    const result=  await clearAll("123abc",pdfid,userId)
+    await deleteMessagesByThreadAndPdf("123abc",pdfid)
     setConversation([])
     dispatch(updatePdfState({aiQuery:''}))
     toast.success(result.message)
@@ -226,7 +238,7 @@ export function AskAI({file, url }: AskAIProps) {
 }
 
 interface MessageBubbleProps {
-  message: { role: "user" | "ai"; content: string }
+  message: { role: "human" | "ai"; content: string }
   index: number
   onCopy: (text: string, index: number) => void
   copied: boolean
@@ -235,7 +247,7 @@ interface MessageBubbleProps {
 function MessageBubble({ message, index, onCopy, copied }: MessageBubbleProps) {
   return (
     <div className="relative group">
-      <Card className={cn(message.role === "user" ? "bg-muted/50 border-muted" : "bg-white border-primary/10")}>
+      <Card className={cn(message.role === "human" ? "bg-muted/50 border-muted" : "bg-white border-primary/10")}>
         <CardContent className="p-4 pt-3">
           {message.role === "ai" ? (
             <div className="flex items-center gap-2 mb-2 text-primary">

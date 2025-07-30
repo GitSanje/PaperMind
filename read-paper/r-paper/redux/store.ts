@@ -9,13 +9,13 @@ import { persistStore, persistReducer } from "redux-persist"
 const highlightPersistConfig = {
     key:'highlights',
     storage,
-    whitelist:['highlights','pdfid','userId']
+    whitelist:['highlights',]
 }
 
 const pdfPersistConfig = {
     key:'pdfsettings',
     storage,
-    whitelist:['summary','citeHighlights','url','file','aiQuery','tab','id']
+    whitelist:['summary','citeHighlights','url','file','aiQuery','tab','pdfTitle','pdfid','userId']
 }
 
 const notionConfig = {

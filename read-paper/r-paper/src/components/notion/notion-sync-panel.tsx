@@ -44,13 +44,14 @@ import {
 
 
 import type { HighlightType } from "@/components/context/globalcontext";
-import { createDb, createPageWorkspace, getWorkspaces, uploadHighlights } from "@/actions/notion";
+import { createDb, createPageWorkspace, getAllHightlightsStatus, getWorkspaces, uploadHighlights } from "@/actions/notion";
 import { toast } from "sonner";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { useAppDispatch, useAppSelector } from "../../../redux/hooks";
 import { fetchNotionData, updateNotionState } from "../../../redux/notionSlice";
+import { updateHState } from "../../../redux/highlightSlice";
 
 interface NotionSyncPanelProps {
   userId: string;
@@ -70,7 +71,8 @@ export function NotionSyncPanel({
 
 
   const dispatch = useAppDispatch()
-  const {databaseUrl,databaseId,availablePages,selectedParentPage,syncResults,notionData} = useAppSelector((state) => state.notion)
+  const {databaseUrl,databaseId,availablePages,selectedParentPage,syncResults,notionData,highlightStatus} = useAppSelector((state) => state.notion)
+  const { pdfid} = useAppSelector((state) => state.pdfsetting)
   
 
   const [isCreatingDatabase, setIsCreatingDatabase] = useState(false);
@@ -91,10 +93,18 @@ export function NotionSyncPanel({
     if (isConnected && userId && availablePages.length ===0) {
       fetchAvailablePages();
     }
-    if(!isConnected && userId){
-         dispatch( fetchNotionData({userId}))
+    if(pdfid && userId && highlightStatus.length ==0){
+      const getAllStatus = async ()=> {
+           const result = await getAllHightlightsStatus(userId,pdfid)
+           if(result){
+              dispatch(updateNotionState({highlightStatus:result}  ))
+           }
+     
+      }
+      getAllStatus()
     }
-  }, [isConnected, userId]);
+    
+  }, [isConnected, userId,pdfid]);
 
 
    // Set default database title based on PDF
@@ -222,8 +232,9 @@ export function NotionSyncPanel({
       const data = await uploadHighlights({
         userId,
         highlights,
-        pdfTitle,
+        pdfId:pdfid,
         databaseId,
+        pdfTitle
       });
 
       clearInterval(progressInterval);
@@ -232,6 +243,7 @@ export function NotionSyncPanel({
       if (data.success) {
         setSyncStatus("completed");
           dispatch(updateNotionState({syncResults:data}));
+          dispatch(updateNotionState({highlightStatus:[]}));
           dispatch(updateNotionState({highlightStatus:data.highlightStatus}));
 
       } else {

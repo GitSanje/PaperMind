@@ -23,7 +23,9 @@ const updateHash = (highlight: HighlightType) => {
 
 
 export function Sidebar({ ispdfAvailable, resetHighlights, toggleDocument }: SidebarProps) {
-  const {highlights,loading,userId,pdfid} = useAppSelector((state) => state.highlight)
+  const {highlights,loading,} = useAppSelector((state) => state.highlight)
+  const {userId,pdfid} = useAppSelector((state) => state.pdfsetting)
+
 
   const dispatch = useAppDispatch()
   const handleDeleteHighlight = async (id:string) => {

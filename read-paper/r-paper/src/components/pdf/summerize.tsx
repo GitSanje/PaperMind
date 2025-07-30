@@ -55,7 +55,7 @@ export function Summarize({
 const dispatch= useAppDispatch()
   const [labelschunks, setLabelschunks] = useState<LabeledChunks | null>();
    const {loadedPdfDocument} = useGlobalContext()
-  const summary = useAppSelector((state) => state.pdfsetting.summary)
+  const {summary,pdfid,userId} = useAppSelector((state) => state.pdfsetting)
 
 
   // useEffect(() => {
@@ -88,7 +88,8 @@ const dispatch= useAppDispatch()
       const formData = new FormData();
       if (filename) formData.append("filename", filename);
       if (url) formData.append("url", url);
-
+    
+       
       const result = await getSummary(formData);
       dispatch(updatePdfState({ summary: result.allsummary}));
       // setLabelschunks(result.chunkswitlables);

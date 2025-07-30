@@ -4,6 +4,7 @@ import { HighlightType } from "@/components/context/globalcontext";
 import { getGemini } from "./summary_llm";
 import { db } from "@/db/prisma";
 import { getAllHashDataFromRedis } from "./pdf";
+import { createNotionHighlightsBulk, NotionHighlightInput } from "./message";
 
 // Retrieving data stored as JSON string within a hash field
 export async function getNotionIntegrationJson(userId: string) {
@@ -75,13 +76,15 @@ export type Status = "idle" | "syncing" | "completed" | "error";
 export async function uploadHighlights({
   userId,
   highlights,
-  pdfTitle,
+  pdfId,
   databaseId,
+  pdfTitle,
 }: {
   userId: string;
   highlights: HighlightType[];
-  pdfTitle: string;
+  pdfId: string;
   databaseId: string;
+  pdfTitle: string;
 }) {
   if (!userId || !highlights || !databaseId) {
     return { error: "Missing required fields", status: false };
@@ -110,7 +113,7 @@ export async function uploadHighlights({
         };
       })
     );
-    let highlightStatus: { id: string; status: Status }[] = [];
+    let highlightStatus: { id: string; status: Status; pid?: string }[] = [];
     // Create pages in Notion database for each highlight
     const results = await Promise.all(
       processedHighlights.map(async (highlight) => {
@@ -223,31 +226,60 @@ export async function uploadHighlights({
             ],
           }),
         });
+        
         if (!pageResponse.ok) {
-          console.error("Failed to create page:", await pageResponse.text());
+           console.error(`❌ Notion API failed for highlight ${highlight.id}:`, await pageResponse.text());
+          await setHstatusToRedis(userId,pdfId,highlight.id,'error')
+          
           highlightStatus.push({
             id: highlight.id,
             status: "error",
+            pid:undefined
           });
           return null;
         }
+
+        await setHstatusToRedis(userId,pdfId,highlight.id,'completed')
+        const page = await pageResponse.json();
         highlightStatus.push({
           id: highlight.id,
           status: "completed",
+          pid: page.id,
         });
 
-        return await pageResponse.json();
+        return page;
       })
+    );
+    const completedIds = new Set(
+      highlightStatus.filter((h) => h.status === "completed").map((h) => h.id)
     );
 
     const successfulPages = results.filter(Boolean);
+    const successfulHighlights = processedHighlights.filter((h) =>
+      completedIds.has(h.id)
+    );
+    const data: NotionHighlightInput[] = successfulHighlights.map((h) => {
+      const pageId = highlightStatus.find((s) => s.id === h.id)?.pid;
 
+      return {
+        highlightData: h,
+        pdfId,
+        userId,
+        hid: h.id,
+        notionPageId: pageId, 
+        pid: databaseId,
+        pdfTitle,
+        databaseId,
+      };
+    });
+
+    await createNotionHighlightsBulk(data);
     return {
       success: true,
       syncedCount: successfulPages.length,
       totalCount: highlights.length,
       pages: successfulPages,
-      highlightStatus: highlightStatus,
+      highlightStatus: highlightStatus.map(({ id, status }) => ({ id, status })),
     };
   } catch (error) {
     return { error: "Internal server error", status: false };
@@ -580,7 +612,7 @@ export async function storeNotionDatabase({
 
     // Store the database ID for this user and PDF
     await client.hset(`notion:databases:${userId}`, {
-      [databaseId]: JSON.stringify({
+      [integrationId]: JSON.stringify({
         databaseId,
         databaseUrl,
         title,
@@ -590,6 +622,7 @@ export async function storeNotionDatabase({
 
     await db.notionPageDB.create({
       data: {
+        id: databaseId,
         userId,
         databaseId,
         databaseUrl,
@@ -606,7 +639,7 @@ export async function storeNotionDatabase({
   }
 }
 
-interface FetchedNotionData {
+export interface FetchedNotionData {
   integration: any | null;
   databases: any | null;
 }
@@ -644,7 +677,8 @@ export async function getNotionIntegrationAndDB(userId: string): Promise<{
     const dbKey = `notion:databases:${userId}`;
     const integrationId = parsedIntegration.integrationId;
     const rawDatabase = await client.hget(dbKey, integrationId);
-
+   console.log(rawDatabase,dbKey,integrationId);
+   
     const parsedDatabase = rawDatabase ? JSON.parse(rawDatabase) : null;
     if (!parsedDatabase) {
       return {
@@ -670,4 +704,22 @@ export async function getNotionIntegrationAndDB(userId: string): Promise<{
       error: "Failed to retrieve Notion data",
     };
   }
+}
+
+export async function getAllHightlightsStatus(userId: string, pdfId: string) {
+  try {
+    const highlightStatus = await client.hgetall(`hstatus:${userId}:${pdfId}`);
+    const result = Object.entries(highlightStatus).map(([id, status]) => ({
+      id,
+      status: status as Status,
+    }));
+    return result;
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function setHstatusToRedis(userId: string, pdfId: string, hid:string,status:Status) {
+      const hkey = `hstatus:${userId}:${pdfId}`;
+      await client.hset(hkey, hid, status);
 }

@@ -41,10 +41,10 @@ setIsLoading(true)
       const data = await response.json()
 
       if (data.connected) {
-        dispatch(updateNotionState({isConnected:true}))
+          dispatch(updateNotionState({isConnected:true}))
          dispatch(updateNotionState({notionData:data.notionData}))
       }
-      dispatch(updateNotionState({isConnected:false}))
+     
        setIsLoading(false)
     } catch (error) {
       console.error("Error checking Notion connection:", error)

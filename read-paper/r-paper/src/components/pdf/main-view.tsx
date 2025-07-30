@@ -48,6 +48,7 @@ import { NotionSyncPanel } from "../notion/notion-sync-panel";
 import { HighlightType } from "../context/globalcontext";
 import { getPdfTitle } from "@/actions/summary_llm";
 import { updatePdfState } from "../../../redux/pdfSlice";
+import { fetchNotionData } from "../../../redux/notionSlice";
 const highlightOptions = [
   "#FFEB3B",
   "#4CAF50",
@@ -90,14 +91,12 @@ export default function PDFViewerPage({ session }: { session: Session }) {
   } = useGlobalContext();
 
   
-  const tab = useAppSelector((state) => state.pdfsetting.tab);
-  const isSelecting = useAppSelector((state) => state.pdfsetting.isSelecting);
-  const file = useAppSelector((state) => state.pdfsetting.file);
-  const url = useAppSelector((state) => state.pdfsetting.url);
-   const pdfTitle = useAppSelector((state) => state.pdfsetting.pdfTitle);
+  const {tab,isSelecting, file,url,pdfTitle} = useAppSelector((state) => state.pdfsetting);
+
+
   const highlights = useAppSelector((state) => state.highlight.highlights);
-  const highlightStatus = useAppSelector((state) => state.notion.highlightStatus);
-  const isConnected = useAppSelector((state) => state.notion.isConnected);
+  const {highlightStatus,isConnected } = useAppSelector((state) => state.notion);
+
 
   const completedIds = new Set(
   highlightStatus
@@ -107,6 +106,8 @@ export default function PDFViewerPage({ session }: { session: Session }) {
 
 const highlightText = highlights
   .filter((h) => h.content.text && !h.url && !completedIds.has(h.id));
+
+  
   const dispatch = useAppDispatch();
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -116,6 +117,8 @@ const highlightText = highlights
       setNotes([]);
     }
   };
+
+
 
 
 
@@ -266,10 +269,17 @@ const highlightText = highlights
     }
   }, [totalPages, setCurrentPage, pdfContainerRef]);
 
+    useEffect(() => {
+      const userId  = session.user.id
+      if(!isConnected && userId){
+           dispatch( fetchNotionData({userId}))
+      }
+    }, [isConnected, session.user.id]);
+    
   const handleTabChange = (newTab: string) => {
       dispatch(updatePdfState({tab:newTab}));
   };
-  const notionAuthUrl = process.env.NEXT_PUBLIC_NOTION_AUTH_URL;
+
   return (
     <div className="container mx-auto py-6 max-w-7xl">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

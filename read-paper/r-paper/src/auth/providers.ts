@@ -3,6 +3,7 @@ import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { signInSchema } from "@/schemas";
 import bcrypt from "bcryptjs";
+import { db } from "@/db/prisma";
 
 export const GoogleProvider = Google({
   clientId: process.env.GOOGLE_ID as string,
@@ -38,7 +39,7 @@ export const CredentialsProvider = Credentials({
         const { email, password } = validatedFields.data;
   
       
-          const user = await prisma.user.findUnique({
+          const user = await db.user.findUnique({
       where: { email },
     });
 

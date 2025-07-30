@@ -1,5 +1,5 @@
 "use client";
-import { getNotionIntegrationAndDB, Status } from "@/actions/notion";
+import { FetchedNotionData, getNotionIntegrationAndDB, Status } from "@/actions/notion";
 
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
 
@@ -48,10 +48,11 @@ any,
       }
 
       const result =  await getNotionIntegrationAndDB(userId)
-       if (!result.success ) {
+      const {integration, databases} = result.notiondata as FetchedNotionData
+       if (!result.success && !integration && !databases ) {
         return thunkApi.rejectWithValue("No notion data found.");
       }
-      return result
+      return result.notiondata
 
     } catch (error) {
       console.error("Error fetching notion data:", error);
@@ -73,7 +74,7 @@ const notionSlice = createSlice({
     if (key === "highlightStatus" && value) {
       const incoming = Array.isArray(value) ? value : [value];
 
-      // Avoid pushing duplicates (optional enhancement)
+
       incoming.forEach((incomingStatus) => {
         const exists = state.highlightStatus.find(
           (s) => s.id === (incomingStatus as any).id
@@ -97,7 +98,9 @@ const notionSlice = createSlice({
            state.isConnected = true
            const {integration, databases} = action.payload
            state.notionData = integration
-           if(databases.length>0){
+           console.log(integration,databases);
+           
+           if(databases && databases.length>0){
             state.databaseId = databases[0].id
             state.databaseUrl = databases[0].url
            }

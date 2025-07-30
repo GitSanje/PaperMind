@@ -5,7 +5,7 @@ import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 
 interface Props {
- id?:string 
+ pdfid:string;
   url: string | null;
   file:File | null;
   pdfTitle:string | null;
@@ -14,10 +14,10 @@ interface Props {
   summary: string;
   tab: string;
   isSelecting: boolean;
+  userId:string,
 }
 
 const initialState: Props = {
-  id: '',
   file: null,
   url: null,
   pdfTitle:'',
@@ -26,6 +26,8 @@ const initialState: Props = {
   summary: '',
   tab: 'tool',
   isSelecting: true,
+  pdfid:'',
+  userId:''
 };
 
 

@@ -51,16 +51,16 @@ export default function Navbar({session} : {
           <span className="text-lg font-bold ">PaperMind</span>
         </Link>
         <nav className="ml-auto hidden gap-6 md:flex">
-          <Link href="/features" className="text-sm font-medium hover:underline underline-offset-4">
+          <Link href="/#" className="text-sm font-medium hover:underline underline-offset-4">
             Features
           </Link>
-          <Link href="/pricing" className="text-sm font-medium hover:underline underline-offset-4">
+          <Link href="/#" className="text-sm font-medium hover:underline underline-offset-4">
             Pricing
           </Link>
-          <Link href="/about" className="text-sm font-medium hover:underline underline-offset-4">
+          <Link href="/#" className="text-sm font-medium hover:underline underline-offset-4">
             About
           </Link>
-          <Link href="/contact" className="text-sm font-medium hover:underline underline-offset-4">
+          <Link href="/#" className="text-sm font-medium hover:underline underline-offset-4">
             Contact
           </Link>
         </nav>

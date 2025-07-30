@@ -75,7 +75,7 @@ import {
 import { useAppDispatch, useAppSelector } from "../../../redux/hooks";
 import HighlightPopup from "./HighlightPopup";
 import { updateNotionState } from "../../../redux/notionSlice";
-import { Status } from "@/actions/notion";
+import { setHstatusToRedis, Status } from "@/actions/notion";
 
 import { Session } from "next-auth";
 import {
@@ -121,17 +121,15 @@ export default function PDFViewer({
   const { handleAskAI, loadedPdfDocument, setPdfDocument } = useGlobalContext();
 
 
-  const citeHighlights = useAppSelector(
-    (state) => state.pdfsetting.citeHighlights
+  const {citeHighlights,isSelecting,pdfTitle,pdfid,userId} = useAppSelector(
+    (state) => state.pdfsetting
   );
-  const isSelecting = useAppSelector((state) => state.pdfsetting.isSelecting);
-  const pdfTitle = useAppSelector((state) => state.pdfsetting.pdfTitle);
 
   const pagehighlights = useAppSelector((state) => state.highlight.highlights);
    const [fileurl, setfileUrl] = useState<string | null>(null);
 
   // When citeHighlights changes, merge them into main highlights
-const { highlights, pdfid, userId } = useAppSelector(state => state.highlight);
+const { highlights } = useAppSelector(state => state.highlight);
 
   const [pdfError, setPdfError] = useState<string | null>(null);
 
@@ -206,8 +204,8 @@ const { highlights, pdfid, userId } = useAppSelector(state => state.highlight);
           });
 
           if (result.status && result.pdf) {
-            dispatch(updatePdfState({ id: result.pdf.id }));
-            dispatch(updateHState({pdfid:result.pdf.id, userId:session.user.id}))
+            dispatch(updatePdfState({ pdfid: result.pdf.id,userId:session.user.id }));
+           
           } else {
             console.error("Failed to store PDF:", result.error);
             return;
@@ -220,13 +218,14 @@ const { highlights, pdfid, userId } = useAppSelector(state => state.highlight);
           const parsed = typeof data === "string" ? JSON.parse(data) : data;
           dispatch(
             updatePdfState({
-              id: parsed.id,
+              pdfid: parsed.id,
               pdfTitle: parsed.title,
               summary: parsed.summary,
+              userId:session.user.id
             })
           );
 
-          dispatch(updateHState({pdfid:parsed.id, userId:session.user.id}))
+         
         }
       } catch (error) {
         console.error("❌ Error in PDF handling:", error);
@@ -368,6 +367,7 @@ const { highlights, pdfid, userId } = useAppSelector(state => state.highlight);
 
     dispatch(addHighlight({ highlight: highlight, color, id }));
     dispatch(updateNotionState({ highlightStatus:[{ id, status: "idle" as Status }]}));
+  
  
     const hdata:HighlightType= { ...highlight, id,color };
     await createHighlight({

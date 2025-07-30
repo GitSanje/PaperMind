@@ -136,13 +136,14 @@ export default function LandingPage({ user} : {
             researchers, and professionals who work with complex PDFs.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Link href="/signin">
+           <Link href={user?.user?.id ? "/pdf-view" : "/signin"}>
               <Button size="lg" className="gap-2">
                 <Upload className="h-5 w-5" />
                 Start Analyzing
                 <ArrowRight className="h-5 w-5" />
               </Button>
             </Link>
+
             <Link href="#features">
               <Button variant="outline" size="lg" className="gap-2">
                 <Sparkles className="h-5 w-5" />

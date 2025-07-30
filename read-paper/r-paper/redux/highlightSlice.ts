@@ -13,11 +13,9 @@ import { deleteHighlightDB, getAllHashDataFromRedis, getHighlightsByUserAndPdfId
  */
 const getNextId = () => String(Math.random()).slice(2);
 
-interface Props { highlights: HighlightType[],pdfid:string; userId:string,error:string|null,loading:boolean}
+interface Props { highlights: HighlightType[],error:string|null,loading:boolean}
 const initialState:Props = {
   highlights: [],
-  pdfid:'',
-  userId:'',
   error:null,
   loading:false
 
@@ -140,7 +138,7 @@ export const highlightSlice = createSlice({
     builder
     .addCase(fetchHighlights.fulfilled, (state,action) => {
        state.loading = false;
-      if (state.highlights.length === 0 && state.pdfid && state.userId) {
+      if (state.highlights.length === 0 ) {
         state.highlights = action.payload;
       }
     })

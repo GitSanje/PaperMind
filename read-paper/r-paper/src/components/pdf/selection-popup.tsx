@@ -15,9 +15,7 @@ interface SelectionPopupProps {
 
 export function SelectionPopup({ position, selectedText, onDictionaryLookup, onAskAI, onClose }: SelectionPopupProps) {
   const menuRef = useRef<HTMLDivElement>(null)
-console.log('====================================');
-console.log(selectedText);
-console.log('====================================');
+
   // Adjust position to ensure menu stays within viewport
   const adjustedPosition = {
     x: Math.min(position.x, window.innerWidth - 200),
